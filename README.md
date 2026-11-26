@@ -1,8 +1,11 @@
 # 🌹 rose — crimson bloom
 
-Eine komplett prozedurale Rosen-Animation im *Tokyo-Ghoul*-Look: dunkle, samtige
-Rose, glühende Adern, fallende Blütenblätter, Glut-Partikel, Bloom, God-Rays,
-Film-Grain und eine Mondsichel über einer Ruinen-Skyline.
+Eine komplett prozedurale Rosen-Animation im *Tokyo-Ghoul*-Look: **nur die
+Rose** — dunkle, samtige Petalen, glühende Adern, fallende Blütenblätter,
+Glut-Partikel, Bloom, God-Rays und Film-Grain vor einem tiefroten Nichts.
+Keine Stadt, kein Horizont, keine Ablenkung; die Blüte ist das ganze Bild.
+
+Wer die Ruinen-Skyline von früher doch haben will: überall `--city` anhängen.
 
 Alles wird **auf der CPU mit numpy gerendert** — kein GPU, kein OpenGL, keine
 Spiel-Engine, keine Shader. Der komplette Renderer (Rasterizer, Shading, Bloom,
@@ -55,8 +58,11 @@ zwei Tricks:
    nicht zu grauem Matsch wird.
 
 Gerendert wird *derselbe* Renderer wie für Poster und Video, nur auf einer
-kleinen Leinwand (ca. 165×93 px, 1,5× supersampled): Petalen, Bloom, Himmel mit
-Mond und Skyline, Glut und fallende Blätter sind identisch. Ein Frame braucht
+kleinen Leinwand (ca. 165×93 px, 1,5× supersampled): Petalen, Bloom, Glut und
+fallende Blätter sind identisch. Weil nur die Rose im Bild ist, ist der
+Ausschnitt dafür gebaut — die Kamera gleitet dicht an der Blüte entlang statt
+um sie herumzukreisen, und Stängel und Blatt bleiben außerhalb des Bildes
+(sonst gucken sie als dunkle Splitter unten heraus). Ein Frame braucht
 dort ~0,2 s, deshalb läuft der Player mit 8 fps und passt sich an die
 Terminalgröße an; jede Frame-Zeit ist die echte Uhrzeit, der Film läuft also in
 Echtzeit weiter, auch wenn das Terminal mal kurz hängt.
@@ -73,7 +79,8 @@ Echtzeit weiter, auch wenn das Terminal mal kurz hängt.
 | `q`, `Esc` | beenden |
 
 Nützliche Flags: `--seconds 20` (nach 20 s aufhören), `--cols 80 --rows 24`
-(Größe erzwingen), `--no-intro`, `--ascii`, `--no-color`, `--fps 16`.
+(Größe erzwingen), `--no-intro`, `--ascii`, `--no-color`, `--fps 16`,
+`--city` (Skyline hinter der Rose wieder einschalten).
 Wird die Ausgabe in eine Datei oder Pipe umgeleitet, malt die App ein
 Standbild als reinen Text (keine Steuerzeichen); mit `--dump out/` bekommt man
 einen ganzen Clip als Textframes.
@@ -98,12 +105,12 @@ Hälfte als RGB).
 
 | Modul | Aufgabe |
 | --- | --- |
-| `rose/scene.py` | Die Rose: 7 Whorls à 3–8 Petalen, jede als gebogenes „Schwert“ mit Kelch-Querschnitt, Sepalen, Stängel, Blatt. Skyline-Geometrie, Lichter, Staub. |
+| `rose/scene.py` | Die Rose: 7 Whorls à 3–8 Petalen, jede als gebogenes „Schwert“ mit Kelch-Querschnitt, Sepalen, Stängel, Blatt. Zwei Licht-Rigs (Bühne/Solo), Skyline-Geometrie für `--city`, Staub. |
 | `rose/raster.py` | Kachelbasierter Software-Rasterizer (10×10-Tiles, vektorisierte Baryzentrik, korrekter Z-Buffer) + Pixel-Shader (Fresnel-Rim, Seiden-Spec, Transmission, AO). |
 | `rose/shading.py` | Prozedurale Petalen-Textur (Adern, Seide, dunkler Schlund, glühende Spitzen) und eingebackene farbige Lichter. |
 | `rose/sky.py` | Gebackene Himmelskuppel: Gradient, Wolken, Mondsichel, Skyline mit Fenstern, rote Glut, Rauch unter dem Horizont. |
 | `rose/effects.py` | Gauß-Splats (Bokeh, Glut, Staub), Bloom-Pyramide, God-Rays, chromatische Aberration, Vignette, Grain, ACES-Tonemapping. |
-| `rose/renderer.py` | Komposition pro Frame: Kamera-Orbit, Blütenöffnen („Atmen“), fallende Blütenblätter mit Motion-Halo, Grading. |
+| `rose/renderer.py` | Komposition pro Frame: Kamera, Blütenöffnen („Atmen“), fallende Blütenblätter mit Motion-Halo, Grading. Enthält den Solo-Modus (`solo()`): roter Studio-Hintergrund statt Himmelskuppel, dichterer Ausschnitt, eigenes Licht. |
 | `rose/server.py` | Mini-HTTP-Server + HTML/Canvas-Player mit Frame-Prefetch. |
 | `rose/terminal.py` | Der „Terminal-Künstler“: Frame → Halbblock-Zellen, truecolor-/256-Farben-/ASCII-Ausgabe, Intro-Titel. |
 | `rose/tui.py` | Der Terminal-Player: Echtzeit-Loop, Tastatur (Pause, Bloom, ASCII, Speichern), Intro, Auto-Resize. |
@@ -125,6 +132,16 @@ Fünf Lichter, die die *Tokyo-Ghoul*-Farbdramaturgie erzeugen:
 3. kaltes teal Back-Light (Kontrast zur roten Blüte),
 4. tiefes rotes Rim-Light (die Signatur),
 5. rote Unterglut („Glut von unten“).
+
+### Nur die Rose
+
+Ohne Skyline fällt der Himmel als Lichtquelle weg, deshalb hat der Solo-Modus
+ein eigenes Rig: das Key-Licht sitzt frontaler (sonst liegt die Vorderseite der
+Blüte im Dunkeln), dafür sind Rim- und Gegenlicht härter — das ist der
+*Tokyo-Ghoul*-Kontrast. Der Hintergrund ist kein Bild, sondern eine Formel: ein
+tiefrotes Leuchten um die Blüte, ein wenig Rauch, ein dunkler Rand zum
+Bildrand hin. Dazu ein größerer, weicherer Halo und mehr Bloom, weil nichts
+mehr da ist, was das Auge ablenkt.
 
 ### Der Look
 
@@ -161,7 +178,7 @@ Durchlauf läuft die Animation flüssig aus dem Cache.
 ```
 rose/              die App (Renderer, Effekte, Terminal-Player, Server, CLI)
 tests/             Tests für Geometrie, Rasterizer, Pipeline und Terminal-Ausgabe
-assets/poster.png  Beispiel-Standbild (1280x720)
+assets/poster.png  Beispiel-Standbild (1600x900)
 assets/rose.mp4    der 10-Sekunden-Loop
 docs/terminal.png  Screenshot-Montage des Terminal-Players
 ```

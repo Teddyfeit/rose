@@ -114,7 +114,7 @@ def paint(cell, truecolor=True, floor=0.030, default_rgb=(0, 0, 0), mono=False):
     lum = np.maximum(_luma(top), _luma(bot))
     dark = lum < floor
 
-    if mono and not truecolor:
+    if mono:
         # the ramp is linear in perceived brightness, the film is not: a gamma
         # lift (and a small gain) is what makes a dark key-visual readable
         mx = np.maximum(np.maximum(top[..., 0], top[..., 1]), top[..., 2])
@@ -127,8 +127,34 @@ def paint(cell, truecolor=True, floor=0.030, default_rgb=(0, 0, 0), mono=False):
         hi = np.percentile(tone, 99.5)
         v = np.clip((tone - lo) / max(hi - lo, 1e-3), 0.0, 1.0) ** 0.85
         step = np.clip(np.rint(v * (len(RAMP) - 1)), 0, len(RAMP) - 1).astype(np.int32)
+        # the void stays empty: without this the auto-level turns the noise in
+        # the near-black background into a field of dots
+        step[v < 0.14] = 0
         chars = np.array(list(RAMP))
-        return ["".join(chars[line]) for line in step]
+        if not truecolor:
+            return ["".join(chars[line]) for line in step]
+
+        # colour terminal, ramp requested (key ``a``): the characters carry the
+        # shading, the *colour* of each cell still carries the rose
+        rgb = np.clip(np.rint(top * 255.0), 0, 255).astype(np.int32)
+        lines = []
+        for y in range(rows):
+            parts = []
+            state = None
+            for x in range(cols):
+                ch = chars[step[y, x]]
+                if ch == " ":
+                    parts.append(" ")
+                    state = None
+                    continue
+                col = "\x1b[38;2;%d;%d;%dm" % tuple(rgb[y, x])
+                if col != state:
+                    parts.append(col)
+                    state = col
+                parts.append(ch)
+            parts.append(RESET)
+            lines.append("".join(parts))
+        return lines
 
     rgb = np.clip(np.rint(np.concatenate([top, bot], axis=2) * 255.0), 0, 255).astype(np.int32)
     top8, bot8 = rgb[:, :, :3], rgb[:, :, 3:]

@@ -161,3 +161,68 @@ def test_terminal_player_paints_and_handles_keys():
     assert player.fps == 6.0
     player._handle("q")
     assert player.running is False
+
+
+def test_solo_shot_is_only_the_rose():
+    """The default film has one subject: no sky, no skyline, no stem."""
+    from rose.renderer import backdrop
+
+    solo = RoseRenderer(160, 90, seed=7).solo()
+    assert solo.only_rose is True
+    full = RoseRenderer(160, 90, seed=7)
+    assert full.only_rose is False
+
+    # the backdrop is a plain crimson void: no horizon line, no city windows
+    rays = np.stack([np.linspace(-0.3, 0.3, 4000, dtype=np.float32),
+                     np.full(4000, 0.05, np.float32),
+                     np.linspace(-1.0, -0.2, 4000, dtype=np.float32)], 1)
+    col = backdrop(rays)
+    assert col.shape == (4000, 3) and np.isfinite(col).all()
+    assert col[:, 0].max() > col[:, 2].max()      # crimson, not blue
+    # a ray at the spot is brighter than one far away
+    spot = backdrop(np.array([[-0.0, 0.02, -1.0], [3.0, 0.0, -1.0]], np.float32))
+    assert spot[0].sum() > spot[1].sum()
+
+    img = solo.render(0.145).astype(np.float32)
+    assert img.shape == (90, 160, 3) and img.mean() > 4
+    # ... and the bloom on its own carries the frame: a solid rose in the
+    # middle, an empty void in the corners
+    lum = np.clip(img.mean(axis=2), 0, 255)
+    h, w = lum.shape
+    mid = lum[h // 4: 3 * h // 4, w // 5: 4 * w // 5]
+    assert (mid > 60).mean() > 0.20
+    corner = np.concatenate([lum[:12, :12].ravel(), lum[:12, -12:].ravel()])
+    assert (corner < 40).mean() > 0.80
+    # it is painted in crimson, not in grey
+    red = img[..., 0].mean()
+    assert red > 1.6 * img[..., 2].mean()
+
+
+def test_stem_is_only_in_the_city_shot():
+    from rose.scene import MAT_STEM, Rose, RoseParams
+
+    head = Rose(RoseParams(seed=7)).build(head=True)
+    whole = Rose(RoseParams(seed=7)).build()
+    assert (whole.M == MAT_STEM).any()
+    assert not (head.M == MAT_STEM).any()
+    assert np.allclose(head.V[:, 1].max(), whole.V[:, 1].max(), atol=0.2)
+
+
+def test_terminal_ramp_keeps_colour_on_a_colour_terminal():
+    """``a`` on a truecolor terminal must not throw the rose away."""
+    import io
+
+    from rose.tui import TerminalRose
+
+    p = TerminalRose(cols=60, rows=17, stream=io.StringIO())
+    p.artist.truecolor = True
+    img = p.renderer.render(0.3)
+    p.artist.mono = True
+    lines = p.artist.paint(img)
+    assert len(lines) == 17
+    assert all("\x1b[38;2;" in line for line in lines)      # still crimson
+    chars = {c for line in lines for c in line if c.isprintable()}
+    assert len(chars & set(" .:-=+*#%@")) >= 4              # ... and a ramp
+    p.artist.mono = False
+    blocks = p.artist.paint(img)
+    assert all("\u2580" in line for line in blocks)         # back to half blocks

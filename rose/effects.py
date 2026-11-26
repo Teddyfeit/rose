@@ -123,13 +123,16 @@ def dust_layer(cam, dust, time, rng):
     p[:, 1] = (p[:, 1] + 2.2) % 4.4 - 2.2
     x, y, z = project(cam, p)
     ok = (z > 0.2) & (x > -40) & (x < w + 40) & (y > -40) & (y < h + 40)
+    # size by distance: a mote behind the flower must not become a bright dot
+    # that reads as a hole in the petals
+    near = np.clip(3.2 / np.maximum(z, 0.4), 0.0, 1.6)
 
     twinkle = 0.35 + 0.65 * (0.5 + 0.5 * np.sin(t * 3.1 + dust.phase * 5.0))
     size = dust.size * cam.focal / np.maximum(z, 0.5) * 0.045
     warm_col = srgb_to_linear(np.array([1.0, 0.24, 0.30], np.float32))
     cold_col = srgb_to_linear(np.array([0.45, 0.85, 1.0], np.float32))
     cols = warm_col[None, :] * dust.warm[:, None] + cold_col[None, :] * (1 - dust.warm)[:, None]
-    inten = 0.055 * twinkle * dust.size ** 1.4
+    inten = 0.055 * twinkle * dust.size ** 1.4 * near ** 1.5
     sp.add(x[ok], y[ok], np.maximum(size[ok], 0.8), cols[ok], inten[ok])
 
     # sparse hot embers that rise and flicker

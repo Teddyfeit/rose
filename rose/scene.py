@@ -293,7 +293,7 @@ class Rose:
     params: RoseParams = field(default_factory=RoseParams)
     mesh: Mesh | None = None
 
-    def build(self, time=0.0, wind=0.0, open_amount=1.0, res=None):
+    def build(self, time=0.0, wind=0.0, open_amount=1.0, res=None, head=False):
         p = self.params
         rng = np.random.default_rng(p.seed)
         mesh = Mesh()
@@ -334,13 +334,22 @@ class Rose:
         mesh.add_grid(bP, bN, bUV.astype(np.float32), MAT_PETAL_INNER)
 
         # --- sepals / leaves below the flower ---------------------------- #
-        nsep = 6
+        nsep = 0 if head else 6
         for k in range(nsep):
             psi = TAU * k / nsep + 0.35
             P, N, UV = build_sepal(psi, rng, scale=p.scale)
             UV[..., 2] = float(petal_id)
             petal_id += 1
             mesh.add_grid(P, N, UV, MAT_LEAF)
+
+        if head:
+            # the solo shot frames the bloom itself: a stem and a leaf poking
+            # out of the bottom of the lens read as debris, not as a flower
+            mesh.finalize()
+            mesh.G = np.round(mesh.UV[:, 2]).astype(np.int32) * 3 + mesh.M * 7
+            mesh.V = mesh.V + p.center[None, :]
+            self.mesh = mesh
+            return mesh
 
         # --- stem --------------------------------------------------------- #
         seg = 30
@@ -404,9 +413,26 @@ class Light:
     radius: float          # 0 = point light, >0 = soft area light
 
 
-def make_lights(center):
-    """The colour script: warm silky key, crimson rim, cold teal back light."""
+def make_lights(center, front=False):
+    """The colour script: warm silky key, crimson rim, cold teal back light.
+
+    ``front`` swings the key round to face the camera and drops the back rim:
+    the bare-backdrop shot has no sky left to light the near side of the bloom.
+    """
     c = center
+    if front:
+        return [
+            # 0 · key: warm silk on the upper petals, but never the whole face
+            Light(np.array([-1.3, 2.3, 3.0]) + c, rgb("#ffe0cf"), 1.15, 0.50),
+            # 1 · fill: crimson from the right, lifts the shadow side
+            Light(np.array([2.8, 0.9, 1.7]) + c, PALETTE["rim_soft"], 0.60, 1.2),
+            # 2 · back: cold teal, rims the silhouette from behind
+            Light(np.array([0.4, 2.5, -2.5]) + c, PALETTE["back"], 2.3, 0.5),
+            # 3 · rim: crimson behind-left — the *Tokyo Ghoul* tell
+            Light(np.array([-2.0, 0.8, -2.2]) + c, PALETTE["rim"], 5.2, 0.35),
+            # 4 · under-glow: crimson haze licking the lowest petals
+            Light(np.array([0.2, -2.1, 2.0]) + c, rgb("#ff2c20"), 1.10, 1.2),
+        ]
     return [
         # 0 · key: warm, upper front-left — paints the silk gradients
         Light(np.array([-2.4, 2.6, 1.9]) + c, rgb("#ffd9c6"), 1.30, 0.45),

@@ -22,7 +22,9 @@ import numpy as np
 def _renderer(args):
     from .renderer import RoseRenderer
 
-    return RoseRenderer(args.width, args.height, loop_seconds=args.loop, seed=args.seed)
+    r = RoseRenderer(args.width, args.height, loop_seconds=args.loop, seed=args.seed)
+    # the film has exactly one subject: the bloom (``--city`` adds the skyline)
+    return r if getattr(args, "city", False) else r.solo()
 
 
 def _save_png(arr, path):
@@ -98,7 +100,7 @@ def cmd_serve(args):
 
     srv = RoseServer(host=args.host, port=args.port, width=args.width,
                      height=args.height, seed=args.seed, cols=args.cols,
-                     rows=args.rows)
+                     rows=args.rows, city=bool(args.city))
     srv.terminal = bool(args.terminal)
     try:
         srv.serve_forever()
@@ -119,6 +121,8 @@ def _parser():
     p.add_argument("--height", type=int, default=480)
     p.add_argument("--seed", type=int, default=7)
     p.add_argument("--loop", type=float, default=26.0, help="seconds per loop")
+    p.add_argument("--city", action="store_true",
+                   help="put the ruined skyline back behind the rose")
     sub = p.add_subparsers(dest="cmd")
 
     from .tui import add_arguments as add_tui_arguments
@@ -127,7 +131,7 @@ def _parser():
     add_tui_arguments(s)
     s.set_defaults(func=cmd_tui)
 
-    s = sub.add_parser("serve", help="live preview in the browser")
+    s = sub.add_parser("serve", help="live preview in the browser", parents=[common])
     s.add_argument("--host", default="0.0.0.0")
     s.add_argument("--port", type=int, default=8000)
     s.add_argument("--terminal", action="store_true",
@@ -136,21 +140,25 @@ def _parser():
     s.add_argument("--rows", type=int, default=31, help="rows of cells (--terminal)")
     s.set_defaults(func=cmd_serve)
 
-    s = sub.add_parser("still", help="render one frame")
+    s = sub.add_parser("still", help="render one frame", parents=[common])
     s.add_argument("out", nargs="?", default="poster.png")
     s.add_argument("--phase", type=float, default=12.0, help="0..100")
     s.set_defaults(func=cmd_still)
 
-    s = sub.add_parser("frames", help="render a PNG sequence")
+    s = sub.add_parser("frames", help="render a PNG sequence", parents=[common])
     s.add_argument("out", nargs="?", default="frames")
     s.add_argument("--seconds", type=float, default=6.0)
     s.add_argument("--fps", type=int, default=24)
+    s.add_argument("--looped", action=argparse.BooleanOptionalAction, default=True,
+                   help="fit exactly one loop into the clip (default: on)")
     s.set_defaults(func=cmd_frames)
 
-    s = sub.add_parser("video", help="render an mp4")
+    s = sub.add_parser("video", help="render an mp4", parents=[common])
     s.add_argument("out", nargs="?", default="rose.mp4")
     s.add_argument("--seconds", type=float, default=8.0)
     s.add_argument("--fps", type=int, default=24)
+    s.add_argument("--looped", action=argparse.BooleanOptionalAction, default=True,
+                   help="fit exactly one loop into the clip (default: on)")
     s.set_defaults(func=cmd_video)
     return p
 

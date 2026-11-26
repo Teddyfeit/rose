@@ -5,8 +5,8 @@ from __future__ import annotations
 import numpy as np
 
 from . import effects
-from .mathutil import (TAU, clamp, normalize, resize_bilinear, srgb_to_linear,
-                       mix, smoothstep, _hash3)
+from .mathutil import (TAU, clamp, fbm3, mix, normalize, resize_bilinear, rgb,
+                       smoothstep, srgb_to_linear, _hash3)
 from .raster import (Camera, build_texture_atlas, make_rays, rasterize,
                      shade_surface, Texture)
 from .scene import (MAT_LEAF, MAT_PETAL, MAT_PETAL_INNER, PALETTE, Dust,
@@ -55,7 +55,7 @@ class Faller:
         d = idx[1:, 1:].ravel()
         self.tris = np.concatenate([np.stack([a, b, d], 1), np.stack([a, d, c], 1)], 0)
 
-    def mesh_at(self, phase, center, scale=1.0):
+    def mesh_at(self, phase, center, scale=1.0, spread=1.0):
         """Return a Mesh with all falling petals at loop-``phase`` in [0,1)."""
         n = self.n
         ph = (phase + self.phase) % 1.0
@@ -65,8 +65,8 @@ class Faller:
         y = 0.75 - ph * 3.6
         ang = self.azim0 + ph * self.drift * TAU * 0.6
         rad = self.rad0 + ph * 1.5
-        cx = np.cos(ang) * rad
-        cz = np.sin(ang) * rad - 1.15
+        cx = np.cos(ang) * rad * spread
+        cz = (np.sin(ang) * rad - 1.15) * spread
         # flutter
         wob = 0.22 * np.sin(ph * TAU * self.flap + self.tilt)
         cx = cx + wob * np.cos(self.tilt * 1.3)
@@ -142,6 +142,40 @@ class Faller:
 
 
 # --------------------------------------------------------------------------- #
+# the rose alone: an infinite studio backdrop instead of the sky dome
+# --------------------------------------------------------------------------- #
+SPOT_AZ = 0.0
+SOLO_DIST = 1.02        # the solo shot sits close: the bloom fills the frame
+SOLO_TARGET_Y = -0.26   # ... aimed a little under the flower
+
+
+def backdrop(rays, spot_az=SPOT_AZ):
+    """Crimson studio void behind the flower (no skyline, no horizon)."""
+    d = rays / (np.linalg.norm(rays, axis=1, keepdims=True) + 1e-9)
+    az = np.arctan2(d[:, 0], -d[:, 2])
+    el = np.arcsin(np.clip(d[:, 1], -1.0, 1.0))
+    daz = np.angle(np.exp(1j * (az - spot_az)))
+    dist = np.sqrt((daz * np.cos(el)) ** 2 + (el - 0.02) ** 2)
+
+    spot = np.exp(-(dist / 0.52) ** 2)[:, None]
+    wide = np.exp(-(dist / 1.80) ** 2)[:, None]
+
+    col = (rgb("#020206")[None, :] * 0.55
+           + rgb("#1a040c")[None, :] * wide * 0.95
+           + rgb("#4e0816")[None, :] * spot * 0.70)
+
+    # slow crimson smoke so the void is never flat
+    p = d * 2.6
+    n = fbm3(p, octaves=3, seed=61)[:, None]
+    smoke = smoothstep(0.34, 0.82, n)
+    col = col * (1.0 - 0.50 * smoke) + (rgb("#4a0813")[None, :] * 0.6
+                                        + rgb("#0b0610")[None, :] * 0.4) * spot * smoke
+    # a darker rim at the very edge of the lens
+    edge = smoothstep(0.55, 1.15, dist)[:, None]
+    return col * (1.0 - 0.72 * edge)
+
+
+# --------------------------------------------------------------------------- #
 # renderer
 # --------------------------------------------------------------------------- #
 class RoseRenderer:
@@ -154,6 +188,7 @@ class RoseRenderer:
         self.bloom_scale = 1.0      # the terminal player can dial the bloom
         self.dist_scale = 1.0       # ... and the framing
         self.target_y = 0.95
+        self.only_rose = False      # no city, no sky: just the flower
         self.exposure = 1.0
         rng = np.random.default_rng(seed)
         self.rng = rng
@@ -162,6 +197,9 @@ class RoseRenderer:
         self.rose = Rose(self.params)
         self.center = self.params.center
         self.lights = make_lights(self.center)
+        # a second light rig for the bare-backdrop shot: the front of the bloom
+        # must be lit, because there is no sky glow left to do it
+        self.lights_solo = make_lights(self.center, front=True)
         self.sky_tex, self.sky_meta = build_sky(seed=seed + 4, glow_az=0.0)
         self.sky = SkySampler(self.sky_tex)
         atlas_rgb, atlas_alpha, atlas_h = build_texture_atlas(rng, n_tiles=20, size=128)
@@ -184,11 +222,22 @@ class RoseRenderer:
         az = 0.30 * np.sin(t) + 0.10 * np.sin(t * 2 + 0.7)
         el = 0.345 + 0.040 * np.sin(t + 1.1)
         dist = (3.95 + 0.16 * np.sin(t + 2.0)) * self.dist_scale
+        ty = self.target_y
+        if self.only_rose:
+            # nothing but the bloom: closer, calmer orbit, aimed at the flower
+            az *= 0.55
+            el = 0.380 + 0.028 * np.sin(t + 1.1)
+            dist = (3.12 + 0.12 * np.sin(t + 2.0)) * self.dist_scale
+            ty = self.target_y
         px = np.sin(az) * dist * np.cos(el)
         pz = np.cos(az) * dist * np.cos(el)
         py = dist * np.sin(el)
+        roll = 0.0
+        if self.only_rose:
+            # a slow dutch tilt: the signature of the anime key visual
+            roll = 0.030 * np.sin(t + 0.6) + 0.012 * np.sin(t * 2.0)
         cam = Camera(self.w, self.h, fov_deg=37.0, pos=(px, py, pz),
-                     target=(0.0, self.target_y, 0.0))
+                     target=(0.0, ty, 0.0), roll=roll)
         return cam
 
     # ------------------------------------------------------------------ #
@@ -207,14 +256,16 @@ class RoseRenderer:
         breath = 0.5 + 0.5 * np.sin(phase * TAU - 1.2)
         open_amount = 0.86 + 0.14 * breath
         mesh = self.rose.build(time=t, wind=1.0, open_amount=open_amount,
-                               res=self.mesh_res)
+                               res=self.mesh_res, head=self.only_rose)
 
-        mesh.attr = bake(mesh, self.lights, self.center)
+        lights = self.lights_solo if self.only_rose else self.lights
+        mesh.attr = bake(mesh, lights, self.center)
 
         # falling petals share the depth buffer with the flower
-        fall = self.fallers.mesh_at(phase, self.center)
+        fall = self.fallers.mesh_at(phase, self.center,
+                                   spread=0.70 if self.only_rose else 1.0)
         fall.G = np.round(fall.UV[:, 2]).astype(np.int32)
-        fall.attr = bake(fall, self.lights, self.center)
+        fall.attr = bake(fall, lights, self.center)
         # shade flying petals a bit hotter so they read against the dark bg
         fall.attr[:, 3:6] *= 1.30
         fall.attr[:, 3:6] += srgb_to_linear(np.array([0.45, 0.06, 0.08], np.float32)) * 0.22
@@ -239,19 +290,24 @@ class RoseRenderer:
         sy = 1 - (np.arange(sh, dtype=np.float32) + 0.5) / sh * 2
         SX, SY = np.meshgrid(sx, sy)
         rays, _ = make_rays(cam, SX.ravel(), -SY.ravel(), None)
-        bg_small = self.sky.sample(rays[:, 3:6]).reshape(sh, sw, 3)
+        if self.only_rose:
+            bg_small = backdrop(rays[:, 3:6]).reshape(sh, sw, 3)
+        else:
+            bg_small = self.sky.sample(rays[:, 3:6]).reshape(sh, sw, 3)
         bg = resize_bilinear(bg_small, h, w)
 
         # a broad crimson halo behind the flower: the classic anime key-visual
         halo = effects.Splatter(w, h)
         hz = effects.project(cam, (self.center + np.array([0, 0.55, 0], np.float32))[None, :])
-        halo.add(hz[0], hz[1], cam.focal * 0.30,
-                 srgb_to_linear(np.array([1.0, 0.15, 0.22], np.float32))[None, :], 0.20)
+        halo_r = cam.focal * (0.46 if self.only_rose else 0.30)
+        halo_i = 0.17 if self.only_rose else 0.20
+        halo.add(hz[0], hz[1], halo_r,
+                 srgb_to_linear(np.array([1.0, 0.15, 0.22], np.float32))[None, :], halo_i)
         img = bg.reshape(-1, 3) + halo.image(h, w).reshape(-1, 3) * 0.55
 
         # ------------------------------------------------------- surface shade
         if len(surf["pix"]):
-            col = shade_surface(surf, cam, self.lights, self.tex, self.center)
+            col = shade_surface(surf, cam, lights, self.tex, self.center)
             img[surf["pix"]] = col
 
         # ------------------------------------------------ glow from the heart
@@ -282,8 +338,10 @@ class RoseRenderer:
         ex_buf = ex.buf + effects.dust_layer(cam, self.dust, t, rng).reshape(-1, 3)
         ex_buf += ex_buf_extra.reshape(-1, 3)
 
-        # bright surface pixels sparkle (silk sheen glints)
-        if len(surf["pix"]):
+        # bright surface pixels sparkle (silk sheen glints) - only on a canvas
+        # big enough for a glint to be a glint; on the terminal's few hundred
+        # pixels they would be single white cells, i.e. noise
+        if len(surf["pix"]) and w >= 480:
             bright = col @ np.array([0.2126, 0.7152, 0.0722], np.float32)
             pick = np.nonzero(bright > 1.6)[0]
             if len(pick):
@@ -314,7 +372,8 @@ class RoseRenderer:
 
         # ------------------------------------------------------------- bloom
         lin = img.reshape(h, w, 3)
-        bl = effects.bloom(lin, threshold=0.74, strength=1.35 * self.bloom_scale)
+        bloom_gain = 1.35 * self.bloom_scale * (1.45 if self.only_rose else 1.0)
+        bl = effects.bloom(lin, threshold=0.74, strength=bloom_gain)
         lin = lin + bl
 
         # ---------------------------------------------------------- god rays
@@ -329,7 +388,8 @@ class RoseRenderer:
         )
         rays_up = resize_bilinear(rays_small, h, w)
         # warm shafts falling from the key light
-        lin = lin + rays_up * srgb_to_linear(np.array([1.0, 0.55, 0.45], np.float32))[None, None, :] * 0.30
+        ray_gain = 0.14 if self.only_rose else 0.30
+        lin = lin + rays_up * srgb_to_linear(np.array([1.0, 0.55, 0.45], np.float32))[None, None, :] * ray_gain
 
         lin = lin * self.exposure
         toned = effects.tonemap_aces(lin)
@@ -365,10 +425,27 @@ class RoseRenderer:
         skyline, moon, glow - stays exactly as it is.
         """
         self.q = 0.85
-        self.mesh_res = (13, 15)
-        self.dist_scale = 1.15      # the terminal pulls back: whole bloom
-        self.target_y = 0.80
-        self.exposure = 1.30        # ... and needs a hotter exposure
+        self.exposure = 1.30        # a coarse canvas needs a hotter exposure
+        if self.only_rose:
+            self.solo()
+        else:
+            self.mesh_res = (13, 15)
+            self.dist_scale = 1.15  # the terminal pulls back: whole bloom
+            self.target_y = 0.80
+        return self
+
+    def solo(self, on=True):
+        """Only the rose: no city, no sky, no horizon - just the bloom.
+
+        The shot is composed for that: nothing is allowed to poke out of the
+        lens, so the camera closes in and glides instead of orbiting.
+        """
+        self.only_rose = bool(on)
+        self.q = 1.0 if on else self.q
+        self.exposure = 1.18 if on else self.exposure
+        self.dist_scale = SOLO_DIST
+        self.target_y = SOLO_TARGET_Y
+        self.mesh_res = None        # full petal grid: it is the whole picture
         return self
 
     def resize(self, w, h):

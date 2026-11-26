@@ -248,10 +248,11 @@ fetch('/info').then(r => r.json()).then(info => {
 
 class RoseServer:
     def __init__(self, host="0.0.0.0", port=8000, width=854, height=480, seed=7,
-                 cols=110, rows=31):
+                 cols=110, rows=31, city=False):
         self.host, self.port = host, port
         self.width, self.height = width, height
         self.seed = seed
+        self.city = bool(city)
         self.renderer = None
         self._lock = threading.Lock()
         self._cache = {}
@@ -274,7 +275,8 @@ class RoseServer:
             if key in self._cache:
                 return self._cache[key]
             if self.renderer is None:
-                self.renderer = RoseRenderer(self.width, self.height, seed=self.seed)
+                r = RoseRenderer(self.width, self.height, seed=self.seed)
+                self.renderer = r if self.city else r.solo()
             t0 = time.perf_counter()
             arr = self.renderer.render(phase)
             dt = time.perf_counter() - t0
@@ -297,7 +299,8 @@ class RoseServer:
             from .tui import TerminalRose
 
             self._player = TerminalRose(cols=self.cols, rows=self.rows,
-                                        seed=self.seed, stream=io.StringIO())
+                                        seed=self.seed, stream=io.StringIO(),
+                                        only_rose=not self.city)
         return self._player
 
     def _get_cells(self, phase):

@@ -21,7 +21,8 @@ from .scene import MAT_LEAF, MAT_PETAL, MAT_PETAL_INNER, MAT_STEM, PALETTE
 # camera
 # --------------------------------------------------------------------------- #
 class Camera:
-    def __init__(self, w, h, fov_deg=34.0, pos=(0.0, 0.30, 6.4), target=(0.0, 0.02, 0.0)):
+    def __init__(self, w, h, fov_deg=34.0, pos=(0.0, 0.30, 6.4), target=(0.0, 0.02, 0.0),
+                 roll=0.0):
         self.w, self.h = w, h
         self.pos = np.asarray(pos, np.float32)
         fwd = np.asarray(target, np.float32) - self.pos
@@ -29,6 +30,12 @@ class Camera:
         right = np.cross(self.fwd, np.array([0, 1, 0], np.float32))
         self.right = right / np.linalg.norm(right)
         self.up = np.cross(self.right, self.fwd)
+        if roll:
+            # dutch angle: the horizon tilts, the shot gets nervous
+            c, s_ = np.cos(roll), np.sin(roll)
+            right, up = self.right.copy(), self.up.copy()
+            self.right = c * right + s_ * up
+            self.up = c * up - s_ * right
         self.focal = (0.5 * h) / np.tan(np.radians(fov_deg) * 0.5)
         # coarse canvases (the terminal) ask the rasteriser to drop sub-pixel
         # triangles; it is set by the renderer, never by the camera itself

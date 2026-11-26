@@ -92,14 +92,22 @@ class Keys:
 # the player
 # --------------------------------------------------------------------------- #
 class TerminalRose:
-    def __init__(self, seed=7, loop=26.0, cols=None, rows=None, stream=None):
+    def __init__(self, seed=7, loop=26.0, cols=None, rows=None, stream=None,
+                 only_rose=True):
         self.out = stream or sys.stdout
         self.seed = seed
         self.loop = loop
+        # the default shot is the rose on its own; ``city=True`` brings the
+        # old skyline back (there is only one subject here)
+        self.only_rose = bool(only_rose)
         self.artist = Artist(cols=cols, rows=rows, out=self.out, supersample=SS)
         if cols is None or rows is None:
             self.artist.fit(ASPECT)
-        self.renderer = RoseRenderer(120, 68, loop_seconds=loop, seed=seed).lite()
+        self.renderer = RoseRenderer(120, 68, loop_seconds=loop, seed=seed)
+        if self.only_rose:
+            self.renderer.solo()
+        else:
+            self.renderer.lite()
         self._fit_renderer()
 
         self.phase = 0.145
@@ -122,7 +130,10 @@ class TerminalRose:
         # readable, cheap enough that the player stays interactive on a laptop
         ss = 1.5 if cols <= 140 else 1.0
         self.artist.supersample = ss
-        w = min(int(round(max(96, cols) * ss)), 360)
+        cap = 420 if self.only_rose else 360      # the bloom is the whole shot
+        # a character cell shows two pixels and is ~twice as tall as wide, so
+        # the canvas must keep the film's aspect: it is stretched onto the grid
+        w = min(int(round(max(96, cols) * ss)), cap)
         h = int(round(max(54, cols / ASPECT) * ss))
         step = 2 * int(ss) if ss >= 2 else 2
         if h % step:
@@ -367,6 +378,8 @@ def add_arguments(p):
     g.add_argument("--no-intro", action="store_true", help="skip the title card")
     g.add_argument("--ascii", action="store_true", help="brightness ramp instead of colour")
     g.add_argument("--no-color", action="store_true", help="never emit colour escapes")
+    g.add_argument("--city", action="store_true",
+                   help="bring back the skyline behind the rose (default: the rose alone)")
     g.add_argument("--dump", default=None, metavar="DIR",
                    help="write a short clip as text frames instead of animating")
     return p
@@ -382,7 +395,8 @@ def main(args):
         # (use --dump to write a whole clip as text)
         return still(args)
 
-    player = TerminalRose(seed=args.seed, loop=args.loop, cols=args.cols, rows=args.rows)
+    player = TerminalRose(seed=args.seed, loop=args.loop, cols=args.cols, rows=args.rows,
+                          only_rose=not args.city)
     if args.ascii:
         player.ascii = True
     player.bloom = BLOOM_LEVELS[1]
@@ -400,7 +414,7 @@ def main(args):
 
 def still(args):
     """One frame as plain text - the sane thing to do with a pipe."""
-    r = RoseRenderer(320, 180, loop_seconds=args.loop, seed=args.seed).lite()
+    r = RoseRenderer(320, 180, loop_seconds=args.loop, seed=args.seed).solo(not args.city)
     a = Artist(cols=args.cols or 100, rows=args.rows or 28, out=sys.stdout,
                truecolor=False, mono=True)
     img = r.render(0.145)
@@ -413,7 +427,7 @@ def dump(args):
     """Render a short clip into text files (used by the docs and by tests)."""
     out = Path(args.dump)
     out.mkdir(parents=True, exist_ok=True)
-    r = RoseRenderer(320, 180, loop_seconds=args.loop, seed=args.seed).lite()
+    r = RoseRenderer(320, 180, loop_seconds=args.loop, seed=args.seed).solo(not args.city)
     a = Artist(cols=args.cols or 100, rows=args.rows or 28, out=open(os.devnull, "w"),
                truecolor=not args.no_color)
     n = max(1, int(round((args.seconds or 2.0) * args.fps)))
