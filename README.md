@@ -179,8 +179,9 @@ Durchlauf läuft die Animation flüssig aus dem Cache.
 rose/              die App (Renderer, Effekte, Terminal-Player, Server, CLI)
 tests/             Tests für Geometrie, Rasterizer, Pipeline und Terminal-Ausgabe
 assets/poster.png  Beispiel-Standbild (1600x900)
-assets/rose.mp4    der 10-Sekunden-Loop
-docs/terminal.png  Screenshot-Montage des Terminal-Players
+assets/rose.mp4    der 10-Sekunden-Loop (nur die Rose, 1280x720)
+assets/rose_web.mp4 die kleine Web-Version (6 MB)
+docs/terminal.png  Screenshot des Terminal-Players (tools/terminal_shot.py)
 ```
 
 Viel Spaß — und ja, die Rose „atmet“ wirklich: sie öffnet und schließt sich
