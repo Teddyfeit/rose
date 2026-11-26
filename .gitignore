@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+build/
+dist/
+*.egg-info/
+
+# generated media
+frames/
+*.mp4
+!assets/*.mp4
+poster.png
