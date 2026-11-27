@@ -377,6 +377,11 @@ class Screen:
         self.out.write("\x1b[H" + "\n".join(canvas.lines()))
         self.out.flush()
 
+    def bell(self):
+        """A short beep for "this key did something you cannot see" moments."""
+        self.out.write("\a")
+        self.out.flush()
+
     def resize_hint(self):  # pragma: no cover - Windows events are best effort
         return terminal_size()
 
@@ -399,9 +404,25 @@ def enable_windows_ansi():  # pragma: no cover - Windows only
 
 
 def enter_windows_utf8():  # pragma: no cover - Windows only
-    """UTF-8 output on legacy consoles; harmless elsewhere."""
-    for stream in (sys.stdout, sys.stderr):
+    """UTF-8 output on legacy consoles; harmless elsewhere.
+
+    The cards are drawn with box characters (``╭ ─ █``).  ``cmd.exe`` defaults to
+    codepage 850/437, where those bytes turn into mojibake, so the console
+    codepage is switched to 65001 as well - the Python-level ``reconfigure``
+    alone only fixes what Python writes, not what the console decodes.
+    """
+    for stream in (sys.stdout, sys.stderr, sys.stdin):
         try:
             stream.reconfigure(encoding="utf-8", errors="replace")
         except Exception:
             pass
+    if os.name != "nt":
+        return
+    try:
+        import ctypes
+
+        kernel32 = ctypes.windll.kernel32
+        kernel32.SetConsoleOutputCP(65001)
+        kernel32.SetConsoleCP(65001)
+    except Exception:
+        pass

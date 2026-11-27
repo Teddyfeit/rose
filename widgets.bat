@@ -4,6 +4,7 @@ rem  Windows 11 widgets - doppelklick startet das Board in einem Terminal.
 rem  Nichts zu installieren ausser Python + den Paketen aus requirements.txt.
 rem ===========================================================================
 setlocal
+chcp 65001 >nul 2>nul
 cd /d "%~dp0"
 
 where py >nul 2>nul
