@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rose"
+version = "0.1.0"
+description = "A procedural, anime-style blooming rose rendered on the CPU with numpy"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "numpy>=1.24",
+    "pillow>=9.0",
+    "imageio-ffmpeg>=0.4",   # only needed for `python -m rose video`
+]
+
+[project.scripts]
+rose = "rose.__main__:main"
+winwidgets = "winwidgets.__main__:main"
+winwidgets-top = "winwidgets.__main__:top_main"
+
+[project.optional-dependencies]
+widgets = ["psutil>=5.9"]
+
+[tool.setuptools]
+packages = ["rose", "winwidgets"]
+
+[tool.setuptools.package-data]
+rose = ["media/*.mp4", "media/*.png"]

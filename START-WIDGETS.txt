@@ -1,0 +1,85 @@
+Windows 11 Widgets - Desktop und Terminal
+=========================================
+
+1. Python installieren (falls noch nicht da): https://www.python.org/downloads/
+   Wichtig bei der Installation: Haken bei "Add python.exe to PATH".
+
+2. Diesen Ordner in ein Terminal holen (Rechtsklick im Ordner -> "Im Terminal
+   oeffnen"). Nichts zu installieren - ausser optional psutil fuer die
+   Netzwerk-Karte:
+
+       python -m pip install psutil
+
+   Ohne psutil laeuft alles andere trotzdem: CPU, RAM, Datentraeger, Prozesse,
+   Uhr und Akku liest das Board direkt aus der Windows-API. Gerade bei ganz
+   neuen Python-Versionen (3.15, ...) gibt es fuer psutil oft noch kein Paket.
+
+3. Starten - das war's:
+
+       python -m winwidgets desktop      <- Fenster auf dem Desktop
+       python -m winwidgets              <- dasselbe im Terminal
+
+   Oder doppelklick auf:
+       widgets-desktop.bat   -> Zeichen auf dem Desktop
+       widgets-settings.bat  -> Einstellungen (eigenes Fenster)
+       widgets.bat           -> dasselbe im Terminal
+
+Standard: ASCII-Zeichen, KEIN Karten-Hintergrund. Es stehen also nur die
+Zeichen auf dem Desktop, wie im Terminal - der Desktop scheint durch.
+
+Desktop-Fenster (ASCII-Stil, wie im Terminal)
+---------------------------------------------
+   ziehen            verschieben
+   Rechtsklick       Menue: Stil, Groesse, Transparenz, Ebene, Farben, Beenden
+   Doppelklick       sofort aktualisieren
+
+   Standard-Ebene: "auf dem Desktop" - die Karten werden in die Desktop-Ebene
+   eingehaengt, liegen also hinter deinen Fenstern (Win+D laesst sie stehen).
+   Rechtsklick -> Ebene wechselt: Desktop -> normales Fenster -> immer vorne.
+   Beim Start steht in der Konsole, welche Ebene wirklich aktiv ist.
+   Strg+C im Terminal  beendet ebenfalls
+
+   Farben und Groesse werden zusammen mit den Positionen in
+   %APPDATA%\winwidgets\widgets.json gespeichert - beim naechsten Start
+   stehen die Karten wieder da, wo du sie hingelegt hast.
+
+Einstellungen (widgets-settings.bat)
+------------------------------------
+   Stil (ASCII / glatt), Hintergrund (nur Zeichen / Karte), Ebene,
+   Groesse, Deckkraft, Aktualisierung, Akzentfarbe, sichtbare Widgets.
+   "Speichern & starten" startet die Widgets mit den neuen Werten neu.
+   Datei: %APPDATA%\winwidgets\widgets.json
+
+   Nuetzliche Zusatzoptionen:
+       python -m winwidgets desktop --opacity 0.65
+       python -m winwidgets desktop --size l
+       python -m winwidgets desktop --accent "#ff4d6d"
+       python -m winwidgets desktop --no-wallpaper   (Windows-Akzent statt Bild)
+       python -m winwidgets desktop --reset          (Positionen zuruecksetzen)
+       python -m winwidgets desktop --panel          (doch wieder Karten-Kasten)
+       python -m winwidgets desktop --flat           (glatte Karten statt Zeichen)
+
+Steuerung
+---------
+   q        beenden
+   space    einfrieren / weiterlaufen
+   1 .. 7   einzelne Widgets an/aus   (Reihenfolge: siehe --list)
+   c        Farbmodus: truecolor -> 256 -> mono
+   s        aktuelles Bild als .txt speichern
+   r        Verlauf der Sparklines loeschen
+
+Nuetzliche Aufrufe
+------------------
+   python -m winwidgets --list            welche Widgets es gibt + Datenquelle
+   python -m winwidgets cpu clock         nur diese zwei
+   python -m winwidgets -i 0.5            zweimal pro Sekunde aktualisieren
+   python -m winwidgets --accent "#ff4d6d"   andere Akzentfarbe
+   python -m winwidgets --plain           ohne Farben (z.B. in eine Datei)
+   python -m winwidgets --snapshot bild.txt   ein Bild rendern und beenden
+
+Tipp fuer Windows Terminal
+--------------------------
+   Einstellungen -> "Standardprofil" -> Schriftart "Cascadia Mono",
+   dann sieht das Board genau so aus wie gedacht. Kein Nerd Font noetig.
+
+Kein Windows? Laeuft auch unter Linux/macOS im Terminal - dieselbe Datei.
