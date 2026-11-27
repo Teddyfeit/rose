@@ -15,10 +15,20 @@ Grading) ist in diesem Repo selbst geschrieben und läuft auf einem Laptop.
 
 ## Windows 11 Widgets — auf dem Desktop
 
-Dieselben Karten, aber als **echte Fenster auf dem Desktop**: randlos,
-halbtransparent, immer im Vordergrund, einzeln verschiebbar. Farben kommen aus
-deinem Hintergrundbild — die Karte nimmt dessen dunkelsten Ton als Glas und
+Dieselben Karten als **echte Fenster auf dem Desktop** — und zwar im
+**ASCII-Stil**: die Fenster zeichnen genau die Zeichen des Terminal-Boards
+(`╭─╮ │ █ ░ ▲`), nur eben als Fenster, das man verschieben kann. Farben kommen
+aus deinem Hintergrundbild: die Karte nimmt dessen dunkelsten Ton als Fläche und
 dessen auffälligste Farbe als Akzent.
+
+Die Karten liegen **auf dem Desktop**, nicht über allem: sie werden per
+Win32-`SetParent` in die Desktop-Ebene gehängt (der `WorkerW`/`Progman`-Layer,
+der das Hintergrundbild malt) — also hinter den Fenstern und hinter den Icons,
+`Win+D` lässt sie stehen, Alt+Tab kennt sie nicht. Das ist derselbe Weg, den
+Wallpaper-Engines benutzen (`WM_SPAWN_WORKER` an `Progman`). Klappt das nicht
+(z. B. unter Linux), sagen sie es beim Start und liegen als normale Fenster da.
+Rechtsklick → Ebene wechselt zwischen **Desktop**, **normal** und **immer im
+Vordergrund**.
 
 ![Desktop-Widgets](docs/desktop.png)
 
@@ -31,8 +41,9 @@ python -m winwidgets desktop --reset              # Positionen zurücksetzen
 
 Doppelklick auf **`widgets-desktop.bat`** geht auch.
 
-* **ziehen** = verschieben, **Rechtsklick** = Menü (Größe, Transparenz, Farben,
-  Beenden), **Doppelklick** = sofort aktualisieren
+* **ziehen** = verschieben, **Rechtsklick** = Menü (Stil ASCII/glatt, Größe,
+  Transparenz, Ebene, Farben, Beenden), **Doppelklick** = sofort aktualisieren
+* `--flat` schaltet auf glatte Karten um, `--ascii` (Standard) zurück
 * Position, Größe, Transparenz und Farbe landen in
   `%APPDATA%\winwidgets\widgets.json` — beim nächsten Start steht alles wie
   vorher

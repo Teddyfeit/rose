@@ -24,18 +24,26 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from winwidgets import content, palette as P          # noqa: E402
+from winwidgets.term import Canvas, Theme              # noqa: E402
+from winwidgets.widgets import make as make_terminal_widgets     # noqa: E402
 from winwidgets.collect import Collector              # noqa: E402
 from winwidgets.wallpaper import (find_wallpaper, sample_pixels,   # noqa: E402
                                   scheme_from_pixels)
 
 FONT_REG = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+FONT_MONO = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"
 FONT_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 SCALE = 2                       # draw at 2x, downscale: text stays crisp
 OPACITY = 0.82
+MONO = None
+MONO_W = 7          # char advance in *device* px (set in main)
+MONO_H = 12         # line height in device px
 
 
-def font(size, bold=False):
+def font(size, bold=False, path=None):
     try:
+        if path:
+            return ImageFont.truetype(path, int(size * SCALE))
         return ImageFont.truetype(FONT_BOLD if bold else FONT_REG, int(size * SCALE))
     except OSError:
         return ImageFont.load_default()
@@ -89,6 +97,71 @@ def colour_of(hex_string):
 
 def rounded(draw, box, radius, fill, outline=None, width=1):
     draw.rounded_rectangle(box, radius=radius, fill=fill, outline=outline, width=width)
+
+
+ASCII_COLS = {"s": 34, "m": 44, "l": 56}
+ASCII_ROWS = {"cpu": 10, "memory": 9, "disk": 9, "network": 9, "clock": 9,
+              "processes": 11, "battery": 7}
+
+
+def ascii_theme(pal):
+    """The terminal theme, coloured from the wallpaper palette (like the app)."""
+    def rgb(h):
+        return tuple(int(h[i:i + 2], 16) for i in (1, 3, 5))
+
+    theme = Theme(accent=rgb(pal["accent"]), mode="truecolor")
+    for name in ("text", "dim", "faint", "track"):
+        style = theme.styles[name]
+        theme.styles[name] = type(style)(name, rgb(pal[name]))
+    theme.styles["card"] = type(theme.styles["card"])("card", rgb(pal["stroke"]))
+    theme._cache.clear()
+    return theme
+
+
+def draw_ascii_card(kind, cols, snap, hist, pal, alpha, mono):
+    """A card drawn as character cells - the exact terminal widget output.
+
+    No panel and no caption: the ASCII frame (``╭─╮``) *is* the card, just like
+    on the terminal board.  All coordinates are device pixels (2x canvas).
+    """
+    pad = content.PAD * SCALE
+    line_h = MONO_H * SCALE
+    char_w = MONO_W
+
+    theme = ascii_theme(pal)
+    widget = make_terminal_widgets([kind])[0]
+    rows = max(4, widget.height(cols))
+    grid = Canvas(cols, rows, theme)
+    grid.clear(style="text")
+    widget.draw(grid, 0, 0, cols, snap, hist)
+
+    w = int(2 * pad + cols * char_w)
+    h = int(rows * line_h + 2 * pad - 6 * SCALE)
+    layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(layer)
+    a = int(round(alpha * 255))
+    rounded(draw, (1, 1, w - 1, h - 1), 7 * SCALE,
+            fill=colour_of(pal["bg"]) + (a,), outline=None)
+
+    for row, (chars, styles) in enumerate(zip(grid.ch, grid.st)):
+        line = "".join(chars)
+        if not line.strip():
+            continue
+        y_px = pad - 6 * SCALE + row * line_h
+        col = 0
+        while col < len(chars):
+            name = styles[col]
+            run_start = col
+            while col < len(chars) and styles[col] == name:
+                col += 1
+            text = line[run_start:col]
+            if not text.strip():
+                continue
+            style = theme.styles.get(name)
+            colour = style.fg if style and style.fg else colour_of(pal["text"])
+            draw.text((pad + run_start * char_w, y_px), text, font=mono,
+                      fill=colour + (a,), anchor="la")
+    return layer, w / SCALE, h / SCALE
 
 
 def draw_card(base, kind, x, y, w, h, prim, pal, alpha, title=None, title_font=None):
@@ -188,17 +261,26 @@ def main(argv):
             "down": collector.h_down, "up": collector.h_up}
 
     title_font = font(8)
+    global MONO, MONO_W, MONO_H
+    MONO = font(10, path=FONT_MONO)
+    MONO_W = int(round(MONO.getlength("0")))            # device px per character
+    MONO_H = int(round(10 * 1.30))
+
     kinds = ["clock", "cpu", "memory", "disk", "network", "processes"]
-    x, y = width - 340, 48
+    cols = 36
+    sizes, layers = {}, {}
     for kind in kinds:
-        w, h = P.card_size(kind, "m")
-        prim = content.build(kind, snap, hist, pal, w, h)
-        layer = draw_card(base, kind, x, y, w, h, prim, pal, OPACITY,
-                          title=content.TITLES.get(kind), title_font=title_font)
-        base.alpha_composite(layer, (x * SCALE, y * SCALE))
-        y += h + 14
-        if y + h > height - 40:
-            y, x = 48, x - 350
+        layer, w, h = draw_ascii_card(kind, cols, snap, hist, pal, OPACITY, MONO)
+        layers[kind] = layer
+        sizes[kind] = (w, h)
+
+    gap = 12
+    total = sum(sizes[k][1] for k in kinds) + gap * (len(kinds) - 1)
+    y = max(30, (height - total) / 2)
+    x = width - max(sizes[k][0] for k in kinds) - 36
+    for kind in kinds:
+        base.alpha_composite(layers[kind], (int(x * SCALE), int(y * SCALE)))
+        y += sizes[kind][1] + gap
 
     img = base.convert("RGB").resize((width // 2, height // 2), Image.LANCZOS)
     out.parent.mkdir(parents=True, exist_ok=True)

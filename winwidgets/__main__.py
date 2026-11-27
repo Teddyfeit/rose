@@ -109,6 +109,10 @@ DESKTOP_HELP = """
   -g, --size     s | m | l        Kartengroesse (Standard m)
       --accent   #rrggbb          Akzentfarbe statt der aus dem Hintergrundbild
       --no-wallpaper              Windows-Akzentfarbe statt Bildfarben
+      --flat                      glatte Karten statt ASCII-Zeichen
+      --topmost                   immer im Vordergrund
+      --normal                    normales Fenster
+      --desktop-layer             auf dem Desktop hinter den Fenstern (Standard)
       --interval 1.0              Aktualisierung in Sekunden
       --reset                     gespeicherte Positionen vergessen
       --list                      verfuegbare Widgets

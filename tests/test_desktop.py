@@ -152,10 +152,82 @@ def test_every_card_is_borderless_transparent_and_has_text(app):
     for kind, card in app.cards.items():
         assert card.win.overrideredirect() is True, kind
         assert card.win.attributes("-alpha") == pytest.approx(0.82)
-        assert card.win.attributes("-topmost") is True
+        # the default is "rests on the desktop", not "always on top" - otherwise
+        # the cards would cover everything you are working in
+        assert card.win.attributes("-topmost") is False
         texts = [t for t in card.canvas.texts() if t.strip()]
         assert texts, f"{kind} drew no text"
         assert card.w == int(card.win.geometry().split("x")[0])
+
+
+def test_cards_render_ascii_box_glyphs(app):
+    """ASCII mode: the same characters as the terminal board."""
+    card = app.cards["cpu"]
+    texts = "".join(card.canvas.texts())
+    assert "\u256d" in texts and "\u2500" in texts and "\u256f" in texts
+    assert "CPU" in texts
+    # the ASCII frame is the card: exactly one box, no second panel around it
+    assert texts.count("\u256d") == 1
+    assert card.win.attributes("-alpha") == pytest.approx(0.82)
+    # one card = a character grid, so every glyph uses the monospace font
+    fonts = {item.kwargs.get("font") for item in card.canvas.items
+             if item.kind == "text" and "content" in item.tags}
+    assert fonts and all(f == app.font_ascii for f in fonts)
+
+
+def test_ascii_cards_show_live_numbers(app):
+    for _ in range(3):
+        app.collector.tick()
+    app.refresh()
+    text = "".join(app.cards["cpu"].canvas.texts())
+    assert "%" in text
+    mem = "".join(app.cards["memory"].canvas.texts())
+    assert "GiB" in mem
+
+
+def test_style_switch_rebuilds_in_the_new_style(app):
+    assert isinstance(app.cards["cpu"], __import__("winwidgets.desktop",
+                                                  fromlist=["x"]).AsciiCard)
+    app.set_style("flat")
+    assert not isinstance(app.cards["cpu"], __import__("winwidgets.desktop",
+                                                      fromlist=["x"]).AsciiCard)
+    assert app.style == "flat"
+    app.set_style("ascii")
+    assert app.style == "ascii"
+
+
+def test_layer_cycles_desktop_normal_topmost(app):
+    assert app.layer == "desktop"
+    # off Windows the desktop layer cannot be attached: nothing is topmost, and
+    # the app says so instead of silently floating over everything
+    assert all(c.win.attributes("-topmost") is False for c in app.cards.values())
+    assert all(c.on_desktop is False for c in app.cards.values())
+
+    app.toggle_layer()                       # -> normal
+    assert app.layer == "normal"
+    assert all(c.win.attributes("-topmost") is False for c in app.cards.values())
+
+    app.toggle_layer()                       # -> topmost
+    assert app.layer == "topmost"
+    assert all(c.win.attributes("-topmost") is True for c in app.cards.values())
+
+    app.toggle_layer()                       # -> back to the desktop
+    assert app.layer == "desktop"
+
+
+def test_desktop_layer_reports_honestly_when_it_fails(app, capsys):
+    """The start-up line must not promise something that did not happen."""
+    assert all(c.on_desktop is False for c in app.cards.values())
+    print(app.layer_label())
+
+
+def test_ascii_theme_uses_wallpaper_colours(app):
+    from winwidgets.desktop import ascii_theme
+
+    theme = ascii_theme(app.pal)
+    accent = theme.styles["accent"].fg
+    assert "#%02x%02x%02x" % accent == app.pal["accent"]
+    assert app.style_colour("accent") == app.pal["accent"]
 
 
 def test_cards_stay_on_screen(app):
@@ -174,7 +246,7 @@ def test_live_data_reaches_the_cards(app):
     cpu_texts = " ".join(app.cards["cpu"].canvas.texts())
     assert "%" in cpu_texts
     mem_texts = " ".join(app.cards["memory"].canvas.texts())
-    assert "GB" in mem_texts
+    assert "GiB" in mem_texts
 
 
 def test_refresh_does_not_pile_up_drawing(app):
@@ -205,8 +277,9 @@ def test_opacity_and_size_menu_actions(app):
     card = app.cards["cpu"]
     app.set_opacity(0.55)
     assert card.win.attributes("-alpha") == pytest.approx(0.55)
+    before = app.cards["cpu"].w
     app.set_size("l")
-    assert app.cards["cpu"].w == P.SIZES["l"]["w"]
+    assert app.cards["cpu"].w > before            # ASCII size grows with the font
     assert all(c.win.attributes("-alpha") == pytest.approx(0.55)
                for c in app.cards.values())
 
@@ -229,7 +302,7 @@ def test_clock_card_updates_over_time(app):
     app.collector.tick()
     app.refresh()
     texts = " ".join(app.cards["clock"].canvas.texts())
-    assert ":" in texts and "läuft seit" in texts
+    assert ":" in texts and "UHR" in texts and "up " in texts
 
 
 def test_network_card_is_honest_without_psutil(app):

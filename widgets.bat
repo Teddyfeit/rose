@@ -28,6 +28,7 @@ if errorlevel 1 (
 )
 
 echo  Beenden mit q  -  Tasten: space einfrieren, 1-7 Karten an/aus, c Farben
+echo  Fenster-Version (auf dem Desktop): widgets-desktop.bat
 %PY% -m winwidgets %*
 if errorlevel 1 pause
 endlocal

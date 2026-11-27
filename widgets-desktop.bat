@@ -14,6 +14,14 @@ if %errorlevel%==0 (
     set "PY=python"
 )
 
-%PY% -m winwidgets desktop %*
-if errorlevel 1 pause
+rem ohne Konsolenfenster starten: pythonw.exe statt python.exe
+set "PYW=%PY:python=pythonw%"
+set "PYW=%PYW:py -3=py -3w%"
+where %PYW% >nul 2>nul
+if %errorlevel%==0 (
+    start "" %PYW% -m winwidgets desktop %*
+) else (
+    %PY% -m winwidgets desktop %*
+    if errorlevel 1 pause
+)
 endlocal

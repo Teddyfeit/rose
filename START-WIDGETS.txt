@@ -22,11 +22,16 @@ Windows 11 Widgets - Desktop und Terminal
    Oder doppelklick auf widgets-desktop.bat  (Fenster)
    bzw. widgets.bat                          (Terminal).
 
-Desktop-Fenster
----------------
+Desktop-Fenster (ASCII-Stil, wie im Terminal)
+---------------------------------------------
    ziehen            verschieben
-   Rechtsklick       Menue: Groesse, Transparenz, Farben, Beenden
+   Rechtsklick       Menue: Stil, Groesse, Transparenz, Ebene, Farben, Beenden
    Doppelklick       sofort aktualisieren
+
+   Standard-Ebene: "auf dem Desktop" - die Karten werden in die Desktop-Ebene
+   eingehaengt, liegen also hinter deinen Fenstern (Win+D laesst sie stehen).
+   Rechtsklick -> Ebene wechselt: Desktop -> normales Fenster -> immer vorne.
+   Beim Start steht in der Konsole, welche Ebene wirklich aktiv ist.
    Strg+C im Terminal  beendet ebenfalls
 
    Farben und Groesse werden zusammen mit den Positionen in

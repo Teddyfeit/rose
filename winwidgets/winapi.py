@@ -365,5 +365,76 @@ class WindowsSampler:
         return None
 
 
+# --------------------------------------------------------------------------- #
+# the desktop layer
+# --------------------------------------------------------------------------- #
+# Explorer draws the wallpaper in a "WorkerW" window that sits behind the
+# icons.  A window whose parent is that WorkerW (or Progman, on Windows 11)
+# belongs to the desktop instead of floating above everything: Win+D keeps it,
+# and it is not part of Alt+Tab.
+_ENUM_PROC = ctypes.WINFUNCTYPE(BOOL, HANDLE, ctypes.c_void_p) if _WINDOWS else None
+
+_find_window = _prototype(KERNEL32, "FindWindowW", HANDLE, LPCWSTR, LPCWSTR)
+_find_child = _prototype(KERNEL32, "FindWindowExW", HANDLE, HANDLE, LPCWSTR, LPCWSTR)
+_enum_windows = _prototype(KERNEL32, "EnumWindows", BOOL, _ENUM_PROC, ctypes.c_void_p) \
+    if _ENUM_PROC else None
+_send_timeout = _prototype(KERNEL32, "SendMessageTimeoutW", ctypes.c_void_p, HANDLE,
+                           ctypes.c_uint32, ctypes.c_size_t, ctypes.c_size_t,
+                           ctypes.c_uint32, ctypes.c_uint32,
+                           ctypes.POINTER(ctypes.c_size_t))
+_set_parent = _prototype(KERNEL32, "SetParent", HANDLE, HANDLE)
+
+
+def desktop_parent():
+    """Handle of the window that draws the desktop, or 0 if it cannot be found.
+
+    ``Progman`` is the shell window; the wallpaper lives in a ``WorkerW`` child
+    of it.  Sending ``WM_SPAWN_WORKER`` (0x052C) makes Explorer create that
+    WorkerW on systems that do not have one yet - the same trick every
+    wallpaper engine uses.
+    """
+    if not _WINDOWS or _find_window is None:
+        return 0
+    progman = _find_window("Progman", None)
+    if not progman:
+        return 0
+    if _send_timeout is not None:
+        result = ctypes.c_size_t(0)
+        # 0x052C, SMTO_NORMAL, 1000 ms
+        _send_timeout(progman, 0x052C, 0, 0, 0, 1000, ctypes.byref(result))
+
+    found = {"worker": 0}
+
+    def callback(hwnd, _lparam):
+        if _find_child is not None and _find_child(hwnd, None, "SHELLDLL_DefView", None):
+            worker = _find_child(0, hwnd, "WorkerW", None) if _find_child else 0
+            if worker:
+                found["worker"] = worker
+        return True
+
+    if _enum_windows is not None:
+        try:
+            _enum_windows(_ENUM_PROC(callback), None)
+        except Exception:                      # pragma: no cover - defensive
+            pass
+    return found["worker"] or progman
+
+
+def attach_to_desktop(window_id):
+    """Make a Tk window part of the desktop.  Returns True when it worked.
+
+    After the reparent the window is below the icons and the wallpaper is drawn
+    by Explorer, so the alpha still applies (DWM keeps it layered) but mouse
+    clicks belong to the desktop - the widget is furniture, not a tool window.
+    """
+    parent = desktop_parent()
+    if not parent or _set_parent is None:
+        return False
+    try:                                       # pragma: no cover - Windows only
+        return bool(_set_parent(int(window_id), parent))
+    except Exception:
+        return False
+
+
 def available() -> bool:
     return _WINDOWS and _global_memory is not None
