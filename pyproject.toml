@@ -19,3 +19,6 @@ rose = "rose.__main__:main"
 
 [tool.setuptools]
 packages = ["rose"]
+
+[tool.setuptools.package-data]
+rose = ["media/*.mp4", "media/*.png"]

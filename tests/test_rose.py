@@ -226,3 +226,23 @@ def test_terminal_ramp_keeps_colour_on_a_colour_terminal():
     p.artist.mono = False
     blocks = p.artist.paint(img)
     assert all("\u2580" in line for line in blocks)         # back to half blocks
+
+
+def test_bundled_media_is_reachable():
+    """The clip ships with the app: a checkout, a wheel and a .pyz all find it."""
+    from rose import assets
+
+    names = {name for name, _label, mb in assets.describe()}
+    assert {"poster.png", "rose.mp4"} <= names
+    data = assets.read("rose.mp4")
+    assert data is not None and len(data) > 1_000_000
+    assert data[4:8] == b"ftyp"                     # a real mp4 container
+
+    import tempfile
+    from pathlib import Path
+
+    with tempfile.TemporaryDirectory() as tmp:
+        out = assets.extract("poster.png", Path(tmp) / "sub" / "poster.png")
+        assert out.is_file() and out.stat().st_size > 100_000
+        with pytest.raises(FileNotFoundError):
+            assets.extract("nope.mp4", Path(tmp) / "x.mp4")

@@ -89,6 +89,24 @@ def cmd_video(args):
     print(f"\n  {out}  ({n} frames @ {args.fps}fps)")
 
 
+def cmd_show(args):
+    """The bundled poster and loops: no render, no dependencies to wait for."""
+    from . import assets
+
+    print()
+    for name, label, mb in assets.describe():
+        print(f"  {name:16s} {mb:5.1f} MB   {label}")
+    print("\n  save one with:  rose save rose.mp4  ~/Downloads/rose.mp4\n")
+
+
+def cmd_save(args):
+    from . import assets
+
+    dest = args.dest or args.name
+    out = assets.extract(args.name, dest)
+    print(f"  {args.name}  ->  {out}   ({out.stat().st_size / 1e6:.1f} MB)")
+
+
 def cmd_tui(args):
     from . import tui
 
@@ -108,7 +126,7 @@ def cmd_serve(args):
         print("\n  stopped")
 
 
-COMMANDS = ("tui", "serve", "still", "frames", "video")
+COMMANDS = ("tui", "serve", "still", "frames", "video", "show", "save")
 
 
 def _parser():
@@ -130,6 +148,15 @@ def _parser():
     s = sub.add_parser("tui", help="the film inside your terminal", parents=[common])
     add_tui_arguments(s)
     s.set_defaults(func=cmd_tui)
+
+    s = sub.add_parser("show", help="list the video and poster that ship with the app")
+    s.set_defaults(func=cmd_show)
+
+    s = sub.add_parser("save", help="copy the bundled video/poster somewhere")
+    s.add_argument("name", choices=["rose.mp4", "rose_web.mp4", "poster.png"])
+    s.add_argument("dest", nargs="?", default=None,
+                   help="target file (default: ./<name>)")
+    s.set_defaults(func=cmd_save)
 
     s = sub.add_parser("serve", help="live preview in the browser", parents=[common])
     s.add_argument("--host", default="0.0.0.0")

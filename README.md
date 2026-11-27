@@ -13,6 +13,21 @@ Grading) ist in diesem Repo selbst geschrieben und läuft auf einem Laptop.
 
 ![Poster](assets/poster.png)
 
+## Herunterladen statt einrichten
+
+Fertige Pakete liegen in `download/` (neu bauen mit
+`.venv/bin/python tools/package.py`):
+
+| Datei | Was es ist |
+| --- | --- |
+| `rose-standalone-v0.1.0.pyz` | **eine** Datei, das Video ist eingebettet: `python rose-standalone-v0.1.0.pyz` startet den Film, `... save rose.mp4 rose.mp4` schreibt den Clip heraus. Braucht nur numpy + Pillow. |
+| `rose-v0.1.0.zip` | das ganze Projekt (Code, Tests, Doku, Video) mit `START-HIER.txt` |
+| `rose.mp4` | nur der Loop, 1280×720, 10 s (14 MB) |
+
+`python rose-standalone-v0.1.0.pyz show` sagt, was drin ist;
+`python rose-standalone-v0.1.0.pyz save poster.png poster.png` holt das Standbild
+heraus. Das Gleiche geht aus dem Quellcode mit `python -m rose show` / `save`.
+
 ## Schnellstart
 
 ```bash
@@ -113,6 +128,7 @@ Hälfte als RGB).
 | `rose/renderer.py` | Komposition pro Frame: Kamera, Blütenöffnen („Atmen“), fallende Blütenblätter mit Motion-Halo, Grading. Enthält den Solo-Modus (`solo()`): roter Studio-Hintergrund statt Himmelskuppel, dichterer Ausschnitt, eigenes Licht. |
 | `rose/server.py` | Mini-HTTP-Server + HTML/Canvas-Player mit Frame-Prefetch. |
 | `rose/terminal.py` | Der „Terminal-Künstler“: Frame → Halbblock-Zellen, truecolor-/256-Farben-/ASCII-Ausgabe, Intro-Titel. |
+| `rose/assets.py` | Die mitgelieferten Dateien finden (Checkout, Wheel oder `.pyz`) und herausschreiben: `show`, `save`. |
 | `rose/tui.py` | Der Terminal-Player: Echtzeit-Loop, Tastatur (Pause, Bloom, ASCII, Speichern), Intro, Auto-Resize. |
 
 ### Die Blüte
