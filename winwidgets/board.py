@@ -83,6 +83,7 @@ class Board:
         self.frozen = frozen
         self.plain = plain
         self.hidden = set()
+        self.note = ""                       # e.g. "source: windows-api"
         self.notice = ""
         self.notice_until = 0.0
         self.frames = 0
@@ -109,6 +110,8 @@ class Board:
 
         # header
         left = "%s  %s" % (BOARD_TITLE, "\u00b7 " + __version__)
+        if self.note:
+            left += "  \u00b7 " + self.note
         right = "%s \u00b7 %s" % (snap.os_name or "?", time.strftime("%H:%M:%S"))
         canvas.put(0, 0, left, "accent")
         canvas.put(max(0, width - len(right)), 0, right[:width], "dim")
@@ -213,10 +216,17 @@ def build(keys=None, plain=False, stream=None, theme=None):
             mode = "truecolor" if supports_truecolor(stream) else "256"
         theme = Theme(accent=windows_accent(), mode=mode)
     collector = Collector()
+    board_note = ""
+    from .collect import backend
+
+    if backend() != "psutil":
+        board_note = "source: " + backend()
     if keys is None and collector.sample.battery is None:
         # a desktop has no battery: do not give it a card full of "no battery"
         widgets = [w for w in widgets if w.key != "battery"]
-    return Board(widgets, theme, collector)
+    board = Board(widgets, theme, collector)
+    board.note = board_note
+    return board
 
 
 def set_console_title(text="Windows 11 widgets"):

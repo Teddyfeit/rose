@@ -168,6 +168,13 @@ class NetworkWidget(Widget):
     def draw(self, canvas, x, y, width, snap, history):
         h = self.height(width)
         inner = self.card(canvas, x, y, width, h)
+        if not snap.net_known:
+            # no wheel for psutil and no honest Win32 source for interface
+            # counters: an empty card with a note beats a card full of zeros
+            canvas.put(x + 2, y + 3, "kein Messwert", "dim")
+            canvas.put(x + 2, y + 4, "psutil fehlt (Python zu neu?)", "faint")
+            canvas.put(x + 2, y + h - 2, "pip install psutil", "accent_dim")
+            return
         canvas.put(x + 2, y + 2, ARROW_DN + " " + fmt_bytes_per_sec(snap.net_down),
                    "accent")
         up = ARROW_UP + " " + fmt_bytes_per_sec(snap.net_up)

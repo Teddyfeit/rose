@@ -22,6 +22,21 @@ try:                                            # pragma: no cover - optional
 except Exception:                               # pragma: no cover
     psutil = None
 
+try:                                            # pragma: no cover - Windows only
+    from .winapi import WindowsSampler, available as _winapi_available
+except Exception:                               # pragma: no cover
+    WindowsSampler = None
+    _winapi_available = lambda: False           # noqa: E731
+
+
+def backend() -> str:
+    """Which source the board is using - shown by ``--list`` and the snapshot."""
+    if psutil is not None:
+        return "psutil"
+    if _winapi_available():
+        return "windows-api"
+    return "proc" if os.path.isdir("/proc") else "none"
+
 HISTORY = 96            # samples kept per series (~8 minutes at 5 s)
 
 
@@ -50,6 +65,7 @@ class Snapshot:
     net_down: float = 0.0                   # MiB/s
     net_up: float = 0.0
     net_total: tuple = (0.0, 0.0)           # GiB (recv, sent)
+    net_known: bool = True                  # False: no honest source available
     procs: list = field(default_factory=list)
     proc_count: int = 0
     battery: float | None = None            # percent
@@ -73,6 +89,9 @@ class Collector:
         self._last_proc_cpu = {}
         self._boot = self._boot_time()
         self._cpu_freq_warned = False
+        self.sampler = None
+        if psutil is None and _winapi_available():      # Windows, no psutil
+            self.sampler = WindowsSampler()
         if psutil is not None:
             # first call is the baseline for every later percentage
             psutil.cpu_percent(interval=None, percpu=True)
@@ -110,6 +129,8 @@ class Collector:
                 seen.add(part.mountpoint)
                 out.append((part.mountpoint,
                             usage.used / 2**30, usage.total / 2**30, usage.percent))
+        elif self.sampler is not None:           # pragma: no cover - Windows only
+            out = self.sampler.disks()
         elif hasattr(os, "statvfs"):
             try:
                 st = os.statvfs("/")
@@ -192,6 +213,20 @@ class Collector:
                 snap.proc_count = len(psutil.pids())
             except Exception:
                 snap.proc_count = 0
+        elif self.sampler is not None:            # pragma: no cover - Windows only
+            total, per_core = self.sampler.cpu()
+            snap.cpu = total
+            snap.cpu_cores = per_core
+            snap.cores = len(per_core) or (os.cpu_count() or 1)
+            pct, used, total_gib, swap = self.sampler.memory()
+            snap.mem_percent, snap.mem_used, snap.mem_total = pct, used, total_gib
+            snap.swap_percent = swap
+            snap.battery, snap.plugged = self.sampler.battery()
+            snap.uptime = self.sampler.uptime()
+            procs = self.sampler.processes()
+            snap.procs = [Proc(name[:22], cpu, mem) for name, cpu, mem in procs]
+            snap.proc_count = len(procs)
+            snap.net_known = self.sampler.net() is not None
         else:                                    # pragma: no cover - fallback path
             try:
                 snap.cpu = float(os.getloadavg()[0] / (os.cpu_count() or 1) * 100.0)
@@ -200,9 +235,13 @@ class Collector:
             snap.cpu_cores = [snap.cpu]
             snap.cores = os.cpu_count() or 1
 
-        snap.disks = self._disks()
-        snap.procs = self._processes()
-        snap.uptime = max(0.0, now - self._boot)
+        snap.disks = snap.disks or self._disks()
+        if not snap.procs and self.sampler is None:
+            snap.procs = self._processes()
+        if not snap.uptime:
+            snap.uptime = max(0.0, now - self._boot)
+        if snap.net_known and self.sampler is not None:
+            snap.net_known = False
 
         # history
         self.h_cpu = (self.h_cpu + [snap.cpu])[-self.history:]

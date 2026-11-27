@@ -101,10 +101,18 @@ def main(argv=None):
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.list:
+        from .collect import backend
+
+        print(f"data source: {backend()}")
         print("widgets:")
         for key in ORDER:
             print(f"  {key:10s} {REGISTRY[key].title}")
         print("\nusage: python -m winwidgets [WIDGET ...] [options]")
+        from .collect import backend
+
+        if backend() != "psutil":
+            print("network needs psutil (pip install psutil); "
+                  "everything else works without it")
         return 0
 
     if args.interval <= 0:

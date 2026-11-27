@@ -5,9 +5,14 @@ Windows 11 Widgets - im Terminal
    Wichtig bei der Installation: Haken bei "Add python.exe to PATH".
 
 2. Diesen Ordner in ein Terminal holen (Rechtsklick im Ordner -> "Im Terminal
-   oeffnen") und einmalig die zwei Pakete installieren:
+   oeffnen"). Nichts zu installieren - ausser optional psutil fuer die
+   Netzwerk-Karte:
 
-       python -m pip install -r requirements.txt
+       python -m pip install psutil
+
+   Ohne psutil laeuft alles andere trotzdem: CPU, RAM, Datentraeger, Prozesse,
+   Uhr und Akku liest das Board direkt aus der Windows-API. Gerade bei ganz
+   neuen Python-Versionen (3.15, ...) gibt es fuer psutil oft noch kein Paket.
 
 3. Starten - das war's:
 
@@ -26,7 +31,7 @@ Steuerung
 
 Nuetzliche Aufrufe
 ------------------
-   python -m winwidgets --list            welche Widgets es gibt
+   python -m winwidgets --list            welche Widgets es gibt + Datenquelle
    python -m winwidgets cpu clock         nur diese zwei
    python -m winwidgets -i 0.5            zweimal pro Sekunde aktualisieren
    python -m winwidgets --accent "#ff4d6d"   andere Akzentfarbe

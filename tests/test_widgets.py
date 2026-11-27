@@ -232,6 +232,91 @@ def test_no_arguments_into_a_pipe_prints_a_banner_not_a_live_board():
     assert "\x1b" not in out.stdout
 
 
+def test_network_card_is_honest_without_a_source(history):
+    canvas = Canvas(46, 12, Theme(mode="mono"))
+    make(["network"])[0].draw(canvas, 0, 0, 46,
+                              fake_snapshot(net_known=False), history)
+    text = "\n".join(canvas.text_lines())
+    assert "kein Messwert" in text
+    assert "KiB/s" not in text
+
+
+def test_windows_sampler_structures_match_the_win32_layout():
+    """The ctypes structs are the documented sizes - a typo there is silent."""
+    import ctypes
+
+    from winwidgets import winapi
+
+    assert ctypes.sizeof(winapi._ProcessorPerformance) == 6 * 8
+    assert ctypes.sizeof(winapi._MemoryStatus) == 64
+    assert ctypes.sizeof(winapi._PowerStatus) == 12
+    assert ctypes.sizeof(winapi._ProcessMemoryCounters) == 8 + 8 * 8
+    assert ctypes.sizeof(winapi._FileTime) == 8
+    # the module must import and report "not available" off Windows
+    assert winapi.available() is False
+
+
+def test_backend_is_reported():
+    from winwidgets.collect import backend
+
+    assert backend() in ("psutil", "windows-api", "proc", "none")
+
+
+def test_sampler_shapes_are_respected_with_a_fake(monkeypatch):
+    """Collector uses the Win32 sampler when psutil is missing."""
+    from winwidgets import collect
+    from winwidgets.board import Board
+
+    monkeypatch.setattr(collect, "psutil", None)      # pretend: no psutil
+
+    class FakeSampler:
+        name = "fake"
+
+        def cpu(self):
+            return 42.0, [10.0, 74.0]
+
+        def memory(self):
+            return 55.0, 8.8, 16.0, 3.0
+
+        def disks(self):
+            return [("C:", 100.0, 500.0, 20.0)]
+
+        def battery(self):
+            return 80.0, True
+
+        def uptime(self):
+            return 1234.0
+
+        def processes(self):
+            return [("chrome.exe", 12.0, 3.0)]
+
+        def net(self):
+            return None
+
+    collector = collect.Collector.__new__(collect.Collector)
+    collector.history = collect.HISTORY
+    collector.h_cpu, collector.h_mem = [], []
+    collector.h_down, collector.h_up = [], []
+    collector._last_net = collector._last_t = None
+    collector._last_proc_cpu = {}
+    collector._boot = 0.0
+    collector._cpu_freq_warned = False
+    collector.sampler = FakeSampler()
+    collector.sample = collect.Snapshot(t=0.0, host="h", os_name="Windows 11")
+
+    snap = collector.tick()
+    assert snap.cpu == 42.0 and snap.cpu_cores == [10.0, 74.0]
+    assert snap.mem_percent == 55.0 and round(snap.mem_total) == 16
+    assert snap.disks == [("C:", 100.0, 500.0, 20.0)]
+    assert snap.battery == 80.0 and snap.plugged is True
+    assert snap.procs[0].name == "chrome.exe"
+    assert snap.net_known is False          # no honest source -> card says so
+
+    canvas = Canvas(46, 12, Theme(mode="mono"))
+    make(["cpu"])[0].draw(canvas, 0, 0, 46, snap, {"cpu": [1, 2, 3]})
+    assert "42%" in "\n".join(canvas.text_lines())
+
+
 def test_unknown_widget_is_rejected():
     from winwidgets.__main__ import main
 
