@@ -47,7 +47,8 @@ KINDS = ["cpu", "memory", "disk", "network", "clock", "processes", "battery"]
 # config
 # --------------------------------------------------------------------------- #
 DEFAULTS = {
-    "opacity": 0.82,
+    "transparent": True,     # no card, no panel: just the characters
+    "opacity": 1.0,
     "size": "m",
     "style": "ascii",        # "ascii" (characters, like the board) or "flat"
     "layer": "desktop",      # desktop | normal | topmost
@@ -160,11 +161,13 @@ class Card:
         except tk.TclError:
             pass
         self.win.geometry("%dx%d+%d+%d" % (width, height, x, y))
-        self.win.configure(bg=self.pal["bg"])
+        background = window_bg(app)
+        self.win.configure(bg=background)
         self.canvas = tk.Canvas(self.win, width=width, height=height,
-                                highlightthickness=0, bd=0, bg=self.pal["bg"])
+                                highlightthickness=0, bd=0, bg=background)
         self.canvas.pack(fill="both", expand=True)
         self._drag = None
+        self.transparency_ok = apply_transparency(self.win, app)
         self._build()
 
     # -- geometry ---------------------------------------------------------- #
@@ -183,9 +186,10 @@ class Card:
         return points
 
     def _build(self):
-        self.canvas.create_polygon(self._corner_points(), smooth=True,
-                                   fill=self.pal["bg"], outline=self.pal["stroke"],
-                                   width=1, tags="frame")
+        if not self.app.transparent:
+            self.canvas.create_polygon(self._corner_points(), smooth=True,
+                                       fill=self.pal["bg"], outline=self.pal["stroke"],
+                                       width=1, tags="frame")
         self.canvas.create_text(content.PAD, 11, anchor="nw", text=self.title,
                                 fill=self.pal["dim"], font=self.app.font_title,
                                 tags="frame")
@@ -350,6 +354,27 @@ class Card:
 # --------------------------------------------------------------------------- #
 # ASCII mode: the terminal card, drawn into a monospace window
 # --------------------------------------------------------------------------- #
+KEY_COLOUR = "#010203"      # Tk's "-transparentcolor": these pixels vanish
+
+
+def window_bg(app):
+    """Background for the window *and* the canvas.
+
+    In transparent mode this is the colour-key colour, so every pixel the
+    characters do not cover becomes see-through - no card, no box, only text.
+    """
+    return KEY_COLOUR if app.transparent else app.pal["bg"]
+
+
+def apply_transparency(window, app):
+    """Ask Windows to make the key colour invisible.  Returns True if it worked."""
+    if not app.transparent:
+        return False
+    try:
+        window.attributes("-transparentcolor", KEY_COLOUR)
+        return True
+    except Exception:                       # Tk without the X11/Windows feature
+        return False
 ASCII_COLS = {"s": 34, "m": 44, "l": 56}
 ASCII_LINE = 14          # px per character row (font size 11, tight leading)
 
@@ -404,11 +429,13 @@ class AsciiCard(Card):
         except tk.TclError:
             pass
         self.win.geometry("%dx%d+%d+%d" % (width, height, x, y))
-        self.win.configure(bg=self.pal["bg"])
+        background = window_bg(app)
+        self.win.configure(bg=background)
         self.canvas = tk.Canvas(self.win, width=width, height=height,
-                                highlightthickness=0, bd=0, bg=self.pal["bg"])
+                                highlightthickness=0, bd=0, bg=background)
         self.canvas.pack(fill="both", expand=True)
         self._drag = None
+        self.transparency_ok = apply_transparency(self.win, app)
         self._bind()
 
     def _bind(self):
@@ -465,6 +492,7 @@ class DesktopApp:
         self.opacity = float(self.config.get("opacity", 0.82))
         self.size = self.config.get("size", "m")
         self.style = self.config.get("style", "ascii")
+        self.transparent = bool(self.config.get("transparent", True))
         self.layer = str(self.config.get("layer", "desktop"))
         self.topmost = self.layer == "topmost"
 
@@ -502,6 +530,11 @@ class DesktopApp:
               "(Größe, Transparenz, Farben, Beenden) · Doppelklick = aktualisieren")
         print("  Farben aus dem Hintergrundbild: "
               + (str(self.scheme.get("wallpaper") or "Windows-Akzentfarbe")))
+        if self.transparent and not self._transparency_ok():
+            print("  Hinweis: dieses Tk kann keine durchsichtigen Fenster "
+                  "(-transparentcolor).")
+            print("           Die Karten bekommen deshalb einen dunklen Karton. "
+                  "Mit --panel ist das derselbe Zustand, nur ohne Hinweis.")
         if self.layer == "desktop":
             attached = sum(1 for c in self.cards.values() if getattr(c, "on_desktop", False))
             if attached:
@@ -603,6 +636,9 @@ class DesktopApp:
     def history(self):
         c = self.collector
         return {"cpu": c.h_cpu, "mem": c.h_mem, "down": c.h_down, "up": c.h_up}
+
+    def _transparency_ok(self):
+        return any(getattr(c, "transparency_ok", False) for c in self.cards.values())
 
     def refresh(self, force=False):
         snap = self.collector.sample
@@ -765,7 +801,11 @@ def options_from(argv, config):
     rest = []
     while args:
         arg = args.pop(0)
-        if arg == "--flat":
+        if arg in ("--no-panel", "--nopanel", "--transparent"):
+            config["transparent"] = True
+        elif arg == "--panel":
+            config["transparent"] = False
+        elif arg == "--flat":
             config["style"] = "flat"
         elif arg in ("--ascii", "--ascii-style"):
             config["style"] = "ascii"

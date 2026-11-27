@@ -19,8 +19,13 @@ Windows 11 Widgets - Desktop und Terminal
        python -m winwidgets desktop      <- Fenster auf dem Desktop
        python -m winwidgets              <- dasselbe im Terminal
 
-   Oder doppelklick auf widgets-desktop.bat  (Fenster)
-   bzw. widgets.bat                          (Terminal).
+   Oder doppelklick auf:
+       widgets-desktop.bat   -> Zeichen auf dem Desktop
+       widgets-settings.bat  -> Einstellungen (eigenes Fenster)
+       widgets.bat           -> dasselbe im Terminal
+
+Standard: ASCII-Zeichen, KEIN Karten-Hintergrund. Es stehen also nur die
+Zeichen auf dem Desktop, wie im Terminal - der Desktop scheint durch.
 
 Desktop-Fenster (ASCII-Stil, wie im Terminal)
 ---------------------------------------------
@@ -38,12 +43,21 @@ Desktop-Fenster (ASCII-Stil, wie im Terminal)
    %APPDATA%\winwidgets\widgets.json gespeichert - beim naechsten Start
    stehen die Karten wieder da, wo du sie hingelegt hast.
 
+Einstellungen (widgets-settings.bat)
+------------------------------------
+   Stil (ASCII / glatt), Hintergrund (nur Zeichen / Karte), Ebene,
+   Groesse, Deckkraft, Aktualisierung, Akzentfarbe, sichtbare Widgets.
+   "Speichern & starten" startet die Widgets mit den neuen Werten neu.
+   Datei: %APPDATA%\winwidgets\widgets.json
+
    Nuetzliche Zusatzoptionen:
        python -m winwidgets desktop --opacity 0.65
        python -m winwidgets desktop --size l
        python -m winwidgets desktop --accent "#ff4d6d"
        python -m winwidgets desktop --no-wallpaper   (Windows-Akzent statt Bild)
        python -m winwidgets desktop --reset          (Positionen zuruecksetzen)
+       python -m winwidgets desktop --panel          (doch wieder Karten-Kasten)
+       python -m winwidgets desktop --flat           (glatte Karten statt Zeichen)
 
 Steuerung
 ---------

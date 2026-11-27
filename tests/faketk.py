@@ -95,8 +95,14 @@ class Toplevel:
         self.overrideredirect_ = bool(value)
         return None
 
+    # Tk on Linux has no -transparentcolor; the stub behaves the same way so the
+    # fallback path gets tested
+    SUPPORTED_ATTRIBUTES = ("-alpha", "-topmost")
+
     def attributes(self, *args):
         if len(args) == 2:
+            if args[0] not in self.SUPPORTED_ATTRIBUTES:
+                raise TclError("bad attribute %r" % (args[0],))
             self.attributes_[args[0]] = args[1]
             return None
         if len(args) == 1:
@@ -143,6 +149,60 @@ class Toplevel:
         return None
 
 
+class _Widget:
+    """Enough of a widget for the settings window: cget/configure/grid/pack."""
+
+    def __init__(self, master=None, **kwargs):
+        self.master = master
+        self.kwargs = dict(kwargs)
+        self.children = []
+        if master is not None and hasattr(master, "children"):
+            master.children.append(self)
+
+    def pack(self, **_kw):
+        return None
+
+    def grid(self, **_kw):
+        return None
+
+    def configure(self, **kw):
+        self.kwargs.update(kw)
+
+    config = configure
+
+    def cget(self, key):
+        return self.kwargs.get(key, "")
+
+    def bind(self, *_a, **_kw):
+        return None
+
+    def winfo_exists(self):
+        return True
+
+    def destroy(self):
+        return None
+
+
+class Variable:
+    def __init__(self, master=None, value=None, name=None):
+        self._value = value
+
+    def get(self):
+        return self._value
+
+    def set(self, value):
+        self._value = value
+
+
+class Scale(_Widget):
+    def get(self):
+        return self.kwargs.get("variable") and self.kwargs["variable"].get() or 0
+
+
+class Spinbox(_Widget):
+    pass
+
+
 class Menu:
     def __init__(self, master=None, **kwargs):
         self.master = master
@@ -182,6 +242,8 @@ class Tk:
     def __init__(self, **kwargs):
         self.options = kwargs
         self.withdrawn = False
+        self.attributes_ = {}
+        self.protocols = {}
         self.title_ = ""
         self.scheduled = []
         self.destroyed = False
@@ -191,6 +253,44 @@ class Tk:
 
     def withdraw(self):
         self.withdrawn = True
+
+    def deiconify(self):
+        return None
+
+    def configure(self, **kw):
+        self.options.update(kw)
+
+    config = configure
+
+    def geometry(self, spec=None):
+        self.geometry_ = spec
+        return spec
+
+    def minsize(self, *_a):
+        return None
+
+    def attributes(self, *args):
+        if len(args) == 2:
+            self.attributes_[args[0]] = args[1]
+            return None
+        return dict(getattr(self, "attributes_", {}))
+
+    def protocol(self, name, func=None):
+        self.protocols = getattr(self, "protocols", {})
+        if func is not None:
+            self.protocols[name] = func
+
+    def cget(self, key):
+        return self.options.get(key, "")
+
+    def update_idletasks(self):
+        return None
+
+    def focus_force(self):
+        return None
+
+    def tk_popup(self, *_a):
+        return None
 
     def title(self, text=None):
         if text is not None:
@@ -243,15 +343,62 @@ def install():
     module.Canvas = Canvas
     module.Menu = Menu
     module.TclError = TclError
+    module.StringVar = Variable
+    module.BooleanVar = Variable
+    module.DoubleVar = Variable
+    module.IntVar = Variable
+    module.Frame = _Widget
+    module.Label = _Widget
+    module.Button = _Widget
+    module.Checkbutton = _Widget
+    module.Radiobutton = _Widget
+    module.Entry = _Widget
+    module.Scale = Scale
+    module.Spinbox = Spinbox
+    module.PhotoImage = _Widget
     module.font = _Fonts
     fonts = types.ModuleType("tkinter.font")
     fonts.families = _Fonts.families
+    fonts.Font = lambda *a, **k: _FontMetrics()
     module.font = fonts
+    ttk = types.ModuleType("tkinter.ttk")
+    for name in ("Frame", "Label", "Button", "Checkbutton", "Radiobutton",
+                 "Entry", "Scale", "Style", "Combobox", "Separator", "Notebook"):
+        setattr(ttk, name, _Widget if name != "Scale" else Scale)
+    ttk.Style = _Style
+    colorchooser = types.ModuleType("tkinter.colorchooser")
+    colorchooser.askcolor = lambda **kw: ((0, 0, 0), "#000000")
+    module.ttk = ttk
+    module.colorchooser = colorchooser
     sys.modules["tkinter"] = module
     sys.modules["tkinter.font"] = fonts
+    sys.modules["tkinter.ttk"] = ttk
+    sys.modules["tkinter.colorchooser"] = colorchooser
     return module
 
 
+class _Style:
+    def __init__(self, master=None):
+        pass
+
+    def theme_use(self, *_a):
+        return None
+
+    def configure(self, *_a, **_kw):
+        return None
+
+    def map(self, *_a, **_kw):
+        return None
+
+
+class _FontMetrics:
+    def measure(self, text):
+        return 7 * len(text)
+
+    def metrics(self, _what):
+        return 14
+
+
 def uninstall():
-    sys.modules.pop("tkinter", None)
-    sys.modules.pop("tkinter.font", None)
+    for name in ("tkinter", "tkinter.font", "tkinter.ttk", "tkinter.colorchooser"):
+        sys.modules.pop(name, None)

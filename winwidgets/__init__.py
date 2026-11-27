@@ -23,6 +23,8 @@ Why it is built the way it is:
 Usage
 -----
     python -m winwidgets                 # the whole board
+    python -m winwidgets desktop         # the same cards as windows
+    python -m winwidgets settings        # the settings window
     python -m winwidgets cpu clock       # only these
     python -m winwidgets --list
     python -m winwidgets --help
@@ -33,6 +35,6 @@ Keys:  ``q`` quit  ``<space>`` freeze/resume  ``1..9`` toggle a widget
 
 from __future__ import annotations
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 BOARD_TITLE = "Windows 11 \u00b7 widgets"

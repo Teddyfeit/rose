@@ -120,7 +120,8 @@ def test_config_roundtrip_and_defaults(tmp_path):
 
     path = tmp_path / "widgets.json"
     config = desktop.load_config(path)
-    assert config["opacity"] == 0.82 and config["size"] == "m"   # defaults
+    assert config["opacity"] == 1.0 and config["size"] == "m"    # defaults
+    assert config["transparent"] is True                         # no card panel
     config["positions"] = {"cpu": [10, 20]}
     config["opacity"] = 0.7
     assert desktop.save_config(config, path)
@@ -129,7 +130,7 @@ def test_config_roundtrip_and_defaults(tmp_path):
     assert again["opacity"] == 0.7
 
     path.write_text("{ this is not json")
-    assert desktop.load_config(path)["opacity"] == 0.82          # never crashes
+    assert desktop.load_config(path)["opacity"] == 1.0           # never crashes
 
 
 def test_cli_options_are_parsed():
@@ -151,7 +152,7 @@ def test_every_card_is_borderless_transparent_and_has_text(app):
     assert app.cards, "no cards spawned"
     for kind, card in app.cards.items():
         assert card.win.overrideredirect() is True, kind
-        assert card.win.attributes("-alpha") == pytest.approx(0.82)
+        assert card.win.attributes("-alpha") == pytest.approx(1.0)
         # the default is "rests on the desktop", not "always on top" - otherwise
         # the cards would cover everything you are working in
         assert card.win.attributes("-topmost") is False
@@ -168,11 +169,33 @@ def test_cards_render_ascii_box_glyphs(app):
     assert "CPU" in texts
     # the ASCII frame is the card: exactly one box, no second panel around it
     assert texts.count("\u256d") == 1
-    assert card.win.attributes("-alpha") == pytest.approx(0.82)
+    assert card.win.attributes("-alpha") == pytest.approx(1.0)
     # one card = a character grid, so every glyph uses the monospace font
     fonts = {item.kwargs.get("font") for item in card.canvas.items
              if item.kind == "text" and "content" in item.tags}
     assert fonts and all(f == app.font_ascii for f in fonts)
+
+
+def test_transparent_mode_draws_only_characters(app):
+    """No panel behind the text: the window background is a colour key."""
+    from winwidgets.desktop import KEY_COLOUR
+
+    card = app.cards["cpu"]
+    assert card.canvas.options["bg"] == KEY_COLOUR
+    # nothing is painted except text - no filled rectangle, no polygon panel
+    assert not card.canvas.find("rect")
+    assert not card.canvas.find("poly")
+    assert card.canvas.texts()
+
+
+def test_opaque_mode_paints_a_card_again(app):
+    app.transparent = False
+    app.rebuild()
+    card = app.cards["cpu"]
+    # ASCII style has no panel either way - but the window is no longer keyed
+    assert card.canvas.options["bg"] == app.pal["bg"]
+    app.set_style("flat")
+    assert app.cards["cpu"].canvas.find("poly")     # the rounded panel is back
 
 
 def test_ascii_cards_show_live_numbers(app):

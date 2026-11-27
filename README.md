@@ -17,7 +17,10 @@ Grading) ist in diesem Repo selbst geschrieben und läuft auf einem Laptop.
 
 Dieselben Karten als **echte Fenster auf dem Desktop** — und zwar im
 **ASCII-Stil**: die Fenster zeichnen genau die Zeichen des Terminal-Boards
-(`╭─╮ │ █ ░ ▲`), nur eben als Fenster, das man verschieben kann. Farben kommen
+(`╭─╮ │ █ ░ ▲`), nur eben als Fenster, das man verschieben kann. **Ohne
+Karten-Hintergrund**: das Fenster ist auf eine Farbe „durchsichtig" geschaltet
+(`-transparentcolor`), also stehen wirklich nur die Zeichen auf dem Desktop —
+kein Kasten, kein Panel, das Hintergrundbild scheint zwischen den Zeilen durch. Farben kommen
 aus deinem Hintergrundbild: die Karte nimmt dessen dunkelsten Ton als Fläche und
 dessen auffälligste Farbe als Akzent.
 
@@ -33,13 +36,23 @@ Vordergrund**.
 ![Desktop-Widgets](docs/desktop.png)
 
 ```bash
-python -m winwidgets desktop          # Fenster (tkinter, kein Extra-Paket)
-python -m winwidgets desktop --opacity 0.65 --size l
-python -m winwidgets desktop --accent "#ff4d6d"   # statt Bildfarbe
-python -m winwidgets desktop --reset              # Positionen zurücksetzen
+python -m winwidgets settings     # Einstellungsfenster (eigene Datei/Batch)
+python -m winwidgets desktop      # nur die Zeichen auf dem Desktop
+python -m winwidgets desktop --panel        # doch mit Karten-Kasten
+python -m winwidgets desktop --flat         # glatte Karten statt Zeichen
+python -m winwidgets desktop --size l --accent "#ff4d6d"
 ```
 
-Doppelklick auf **`widgets-desktop.bat`** geht auch.
+Drei Doppelklick-Dateien liegen dabei:
+
+| Datei | öffnet |
+| --- | --- |
+| `widgets-desktop.bat` | die Zeichen auf dem Desktop |
+| `widgets-settings.bat` | das **Einstellungsfenster** (Stil, Hintergrund, Ebene, Größe, Deckkraft, Farbe, welche Widgets) |
+| `widgets.bat` | dasselbe Board im Terminal |
+
+Das Einstellungsfenster schreibt `%APPDATA%\winwidgets\widgets.json` und
+startet die Widgets auf Knopfdruck mit den neuen Werten neu.
 
 * **ziehen** = verschieben, **Rechtsklick** = Menü (Stil ASCII/glatt, Größe,
   Transparenz, Ebene, Farben, Beenden), **Doppelklick** = sofort aktualisieren

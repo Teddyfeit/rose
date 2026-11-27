@@ -87,6 +87,7 @@ def select(args):
 BANNER = """
   python -m winwidgets            das Board im Terminal
   python -m winwidgets desktop    die Karten als Fenster auf dem Desktop
+  python -m winwidgets settings   Einstellungsfenster
   python -m winwidgets cpu clock  nur diese Karten (Terminal)
   python -m winwidgets --list     was es gibt
 
@@ -96,6 +97,18 @@ BANNER = """
 
 
 DESKTOP_FLAGS = {"--desktop", "desktop", "--fenster", "fenster"}
+SETTINGS_FLAGS = {"settings", "--settings", "einstellungen"}
+
+SETTINGS_HELP = """
+  python -m winwidgets settings
+
+  Oeffnet das Einstellungsfenster: Stil (ASCII oder glatt), Hintergrund
+  (nur Zeichen oder Karte), Ebene (Desktop / normal / vorne), Groesse,
+  Deckkraft, Aktualisierung, Akzentfarbe und welche Widgets sichtbar sind.
+  "Speichern & starten" startet die Widgets mit diesen Werten neu.
+
+  Gespeichert wird in %APPDATA%\\winwidgets\\widgets.json
+"""
 
 DESKTOP_HELP = """
   python -m winwidgets desktop [WIDGET ...] [OPTIONEN]
@@ -121,6 +134,13 @@ DESKTOP_HELP = """
 
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] in SETTINGS_FLAGS:
+        if any(a in ("-h", "--help") for a in argv[1:]):
+            print(SETTINGS_HELP)
+            return 0
+        from .settings import main as settings_main
+
+        return settings_main() or 0
     if argv and argv[0] in DESKTOP_FLAGS:
         rest = [a for a in argv[1:] if a not in DESKTOP_FLAGS]
         if any(a in ("-h", "--help") for a in rest):
@@ -150,7 +170,7 @@ def main(argv=None):
             print(f"  Hinweis: {flag} gilt nur fuer das Terminal-Board")
         from .desktop import main as desktop_main
 
-        return desktop_main(names or None, argv=[k for k in kept if k not in unknown])
+        return desktop_main(names or None, argv=[k for k in kept if k not in unknown]) or 0
     if argv:
         return _terminal_main(argv)
     return _terminal_main(None)

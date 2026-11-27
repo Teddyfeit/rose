@@ -34,7 +34,8 @@ FONT_REG = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 FONT_MONO = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"
 FONT_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 SCALE = 2                       # draw at 2x, downscale: text stays crisp
-OPACITY = 0.82
+OPACITY = 1.0
+TRANSPARENT = True      # only the characters - no card behind them
 MONO = None
 MONO_W = 7          # char advance in *device* px (set in main)
 MONO_H = 12         # line height in device px
@@ -91,6 +92,11 @@ def fit_wallpaper(path, size):
     return img.crop((left, top, left + target_w, top + target_h))
 
 
+def _wal_luminance(rgb):
+    r, g, b = (c / 255.0 for c in rgb)
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
 def colour_of(hex_string):
     return tuple(int(hex_string[i:i + 2], 16) for i in (1, 3, 5))
 
@@ -140,8 +146,9 @@ def draw_ascii_card(kind, cols, snap, hist, pal, alpha, mono):
     layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     draw = ImageDraw.Draw(layer)
     a = int(round(alpha * 255))
-    rounded(draw, (1, 1, w - 1, h - 1), 7 * SCALE,
-            fill=colour_of(pal["bg"]) + (a,), outline=None)
+    if not TRANSPARENT:
+        rounded(draw, (1, 1, w - 1, h - 1), 7 * SCALE,
+                fill=colour_of(pal["bg"]) + (a,), outline=None)
 
     for row, (chars, styles) in enumerate(zip(grid.ch, grid.st)):
         line = "".join(chars)
@@ -265,6 +272,17 @@ def main(argv):
     MONO = font(10, path=FONT_MONO)
     MONO_W = int(round(MONO.getlength("0")))            # device px per character
     MONO_H = int(round(10 * 1.30))
+
+    # without a card the characters sit directly on the wallpaper, so the
+    # palette must be readable on the picture itself, not on a dark panel
+    if TRANSPARENT:
+        lum = sum(_wal_luminance(p) for p in (pixels or [(30, 30, 30)])) / max(1, len(pixels or [1]))
+        if lum > 0.55:
+            pal = dict(pal)
+            for key, value in (("text", (18, 20, 26)), ("dim", (52, 56, 66)),
+                               ("faint", (86, 90, 100))):
+                pal[key] = "#%02x%02x%02x" % value
+            pal["track"] = "#3a3d46"
 
     kinds = ["clock", "cpu", "memory", "disk", "network", "processes"]
     cols = 36

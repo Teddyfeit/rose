@@ -1,7 +1,8 @@
 @echo off
 rem ===========================================================================
-rem  Windows 11 Widgets als Fenster auf dem Desktop.
+rem  Windows 11 Widgets als Zeichen auf dem Desktop.
 rem  startet python -m winwidgets desktop  (tkinter ist in Python enthalten)
+rem  Einstellungen: widgets-settings.bat
 rem ===========================================================================
 setlocal
 chcp 65001 >nul 2>nul
