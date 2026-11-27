@@ -16,12 +16,24 @@ if %errorlevel%==0 (
 
 %PY% -c "import psutil" >nul 2>nul
 if not %errorlevel%==0 (
-    echo  psutil fehlt - installiere es einmalig:
-    echo     %PY% -m pip install -r requirements.txt
-    pause
-    exit /b 1
+    if exist requirements.txt (
+        echo  Erststart: installiere psutil ...
+        %PY% -m pip install -q -r requirements.txt
+    ) else (
+        echo  Erststart: installiere psutil ...
+        %PY% -m pip install -q psutil
+    )
+    %PY% -c "import psutil" >nul 2>nul
+    if not %errorlevel%==0 (
+        echo.
+        echo  Das hat nicht geklappt. Bitte einmal von Hand:
+        echo     %PY% -m pip install psutil
+        pause
+        exit /b 1
+    )
 )
 
+echo  Beenden mit q  -  Tasten: space einfrieren, 1-7 Karten an/aus, c Farben
 %PY% -m winwidgets %*
 if errorlevel 1 pause
 endlocal

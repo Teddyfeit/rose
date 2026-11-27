@@ -218,6 +218,20 @@ def test_collector_returns_a_usable_snapshot():
     assert len(collector.h_cpu) == 3
 
 
+def test_no_arguments_into_a_pipe_prints_a_banner_not_a_live_board():
+    """``widgets.bat  > log`` must not stream escape codes into a file."""
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    out = subprocess.run([sys.executable, "-m", "winwidgets"], cwd=root,
+                         capture_output=True, text=True, timeout=60)
+    assert out.returncode == 0
+    assert "python -m winwidgets" in out.stdout
+    assert "\x1b" not in out.stdout
+
+
 def test_unknown_widget_is_rejected():
     from winwidgets.__main__ import main
 

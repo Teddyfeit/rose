@@ -84,7 +84,20 @@ def select(args):
     return wanted or None
 
 
+BANNER = """
+  python -m winwidgets            das Board (oder Doppelklick auf widgets.bat)
+  python -m winwidgets cpu clock  nur diese Karten
+  python -m winwidgets --list     was es gibt
+
+  Tasten:  q beenden  .  space einfrieren  .  1-7 Karte an/aus
+           c Farbmodus  .  s Bild speichern  .  r Verlauf loeschen
+"""
+
+
 def main(argv=None):
+    if argv is None and len(sys.argv) == 1 and not sys.stdout.isatty():
+        print(BANNER)
+        return 0
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.list:
