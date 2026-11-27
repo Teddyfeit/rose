@@ -1,0 +1,41 @@
+Windows 11 Widgets - im Terminal
+================================
+
+1. Python installieren (falls noch nicht da): https://www.python.org/downloads/
+   Wichtig bei der Installation: Haken bei "Add python.exe to PATH".
+
+2. Diesen Ordner in ein Terminal holen (Rechtsklick im Ordner -> "Im Terminal
+   oeffnen") und einmalig die zwei Pakete installieren:
+
+       python -m pip install -r requirements.txt
+
+3. Starten - das war's:
+
+       python -m winwidgets
+
+   Oder einfach doppelklick auf widgets.bat.
+
+Steuerung
+---------
+   q        beenden
+   space    einfrieren / weiterlaufen
+   1 .. 7   einzelne Widgets an/aus   (Reihenfolge: siehe --list)
+   c        Farbmodus: truecolor -> 256 -> mono
+   s        aktuelles Bild als .txt speichern
+   r        Verlauf der Sparklines loeschen
+
+Nuetzliche Aufrufe
+------------------
+   python -m winwidgets --list            welche Widgets es gibt
+   python -m winwidgets cpu clock         nur diese zwei
+   python -m winwidgets -i 0.5            zweimal pro Sekunde aktualisieren
+   python -m winwidgets --accent "#ff4d6d"   andere Akzentfarbe
+   python -m winwidgets --plain           ohne Farben (z.B. in eine Datei)
+   python -m winwidgets --snapshot bild.txt   ein Bild rendern und beenden
+
+Tipp fuer Windows Terminal
+--------------------------
+   Einstellungen -> "Standardprofil" -> Schriftart "Cascadia Mono",
+   dann sieht das Board genau so aus wie gedacht. Kein Nerd Font noetig.
+
+Kein Windows? Laeuft auch unter Linux/macOS im Terminal - dieselbe Datei.

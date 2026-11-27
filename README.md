@@ -13,6 +13,35 @@ Grading) ist in diesem Repo selbst geschrieben und läuft auf einem Laptop.
 
 ![Poster](assets/poster.png)
 
+## Windows 11 Widgets — im Terminal
+
+Dieselbe Idee, andere Richtung: ein **Widget-Board für den Desktop, das in
+Windows Terminal läuft** — keine Webseite, kein Fenster, kein Server. Karten im
+Windows-11-Look (runde Ecken, Akzentfarbe aus Windows, Segoe-Anmutung) mit
+Live-CPU, RAM, Datenträgern, Netzwerk, Top-Prozessen, Uhr und Akku.
+
+![Widgets](docs/widgets.png)
+
+```bash
+python -m pip install psutil          # einziges Extra
+python -m winwidgets                  # Board starten
+python -m winwidgets cpu clock        # nur zwei Karten
+python -m winwidgets --list           # was es gibt
+```
+
+Tasten: `q` beenden · `space` einfrieren · `1`–`7` Karte an/aus · `c` Farbmodus
+(truecolor → 256 → mono) · `s` Bild als Text speichern · `r` Verlauf löschen.
+
+Auf Windows reicht Doppelklick auf **`widgets.bat`**; die ausführliche
+Anleitung steht in **`START-WIDGETS.txt`**. Fertige Pakete:
+`download/winwidgets-v0.2.0.zip` und `download/winwidgets-v0.2.0.pyz`.
+
+Warum Terminal und nicht HTML: ein Board, das man den ganzen Tag offen hat,
+sollte ein Tab sein und kein Browserfenster — und 25 kB Python statt 300 kB
+JavaScript. Die Karten zeichnen sich mit Box-Zeichen aus der Standardschrift
+(`│ ─ ╭ ╮ ─ █ ░`), also **kein Nerd Font nötig**; Farben laufen über 24-Bit-ANSI
+und fallen automatisch auf 256 Farben oder reines ASCII zurück.
+
 ## Herunterladen statt einrichten
 
 Fertige Pakete liegen in `download/` (neu bauen mit

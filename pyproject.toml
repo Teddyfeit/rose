@@ -16,9 +16,14 @@ dependencies = [
 
 [project.scripts]
 rose = "rose.__main__:main"
+winwidgets = "winwidgets.__main__:main"
+winwidgets-top = "winwidgets.__main__:top_main"
+
+[project.optional-dependencies]
+widgets = ["psutil>=5.9"]
 
 [tool.setuptools]
-packages = ["rose"]
+packages = ["rose", "winwidgets"]
 
 [tool.setuptools.package-data]
 rose = ["media/*.mp4", "media/*.png"]
