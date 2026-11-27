@@ -7,8 +7,8 @@ What you get in ``download/``:
 * ``winwidgets-v0.2.0.zip``       the widget board (code, tests, docs) plus a
                                  ``START-WIDGETS.txt`` and a double-clickable
                                  ``widgets.bat``.
-* ``winwidgets-v0.2.0.pyz``       one file: ``python winwidgets.pyz`` starts the
-                                 board.  Still needs ``psutil`` (and on Windows
+* ``winwidgets-v0.3.0.pyz``       one file: ``python winwidgets.pyz`` starts the
+                                 terminal board, ``... desktop`` the windows.  Still needs ``psutil`` (and on Windows
                                  ``colorama`` is *not* needed - the drawing is
                                  plain ANSI).
 
@@ -25,7 +25,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 DIST = ROOT / "download"
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 PACKAGE = "winwidgets"
 
 STANDALONE_MAIN = '''\
@@ -54,9 +54,11 @@ def _files():
 
         out = subprocess.run(
             ["git", "ls-files", "-co", "--exclude-standard", PACKAGE,
-             "tests/test_widgets.py", "tools/widget_shot.py",
-             "START-WIDGETS.txt", "widgets.bat", "requirements.txt",
-             "pyproject.toml", "docs/widgets.png"],
+             "tests/test_widgets.py", "tests/test_desktop.py",
+             "tests/faketk.py", "tools/widget_shot.py", "tools/desktop_shot.py",
+             "START-WIDGETS.txt", "widgets.bat", "widgets-desktop.bat",
+             "requirements.txt", "pyproject.toml",
+             "docs/widgets.png", "docs/desktop.png"],
             cwd=ROOT, capture_output=True, text=True, check=True).stdout
         files = [ROOT / line for line in out.splitlines() if line.strip()]
         if files:

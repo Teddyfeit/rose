@@ -33,6 +33,6 @@ Keys:  ``q`` quit  ``<space>`` freeze/resume  ``1..9`` toggle a widget
 
 from __future__ import annotations
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 BOARD_TITLE = "Windows 11 \u00b7 widgets"

@@ -85,8 +85,9 @@ def select(args):
 
 
 BANNER = """
-  python -m winwidgets            das Board (oder Doppelklick auf widgets.bat)
-  python -m winwidgets cpu clock  nur diese Karten
+  python -m winwidgets            das Board im Terminal
+  python -m winwidgets desktop    die Karten als Fenster auf dem Desktop
+  python -m winwidgets cpu clock  nur diese Karten (Terminal)
   python -m winwidgets --list     was es gibt
 
   Tasten:  q beenden  .  space einfrieren  .  1-7 Karte an/aus
@@ -94,7 +95,64 @@ BANNER = """
 """
 
 
+DESKTOP_FLAGS = {"--desktop", "desktop", "--fenster", "fenster"}
+
+DESKTOP_HELP = """
+  python -m winwidgets desktop [WIDGET ...] [OPTIONEN]
+
+  Die Karten als randlose, halbtransparente Fenster auf dem Desktop.
+  Ziehen = verschieben, Rechtsklick = Menue (Groesse, Transparenz, Farben,
+  Beenden), Doppelklick = aktualisieren.
+
+  WIDGET     cpu memory disk network clock processes battery
+  -o, --opacity  0.25 .. 1.0      Transparenz (Standard 0.82)
+  -g, --size     s | m | l        Kartengroesse (Standard m)
+      --accent   #rrggbb          Akzentfarbe statt der aus dem Hintergrundbild
+      --no-wallpaper              Windows-Akzentfarbe statt Bildfarben
+      --interval 1.0              Aktualisierung in Sekunden
+      --reset                     gespeicherte Positionen vergessen
+      --list                      verfuegbare Widgets
+"""
+
+
 def main(argv=None):
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] in DESKTOP_FLAGS:
+        rest = [a for a in argv[1:] if a not in DESKTOP_FLAGS]
+        if any(a in ("-h", "--help") for a in rest):
+            print(DESKTOP_HELP)
+            return 0
+        if "--list" in rest:
+            from .widgets import ORDER
+
+            print("widgets: " + ", ".join(ORDER))
+            return 0
+        flags_with_value = {"--opacity", "-o", "--size", "-g", "--accent",
+                            "--interval", "-i"}
+        names, kept, i = [], [], 0
+        while i < len(rest):
+            arg = rest[i]
+            if arg in flags_with_value and i + 1 < len(rest):
+                kept.extend([arg, rest[i + 1]])
+                i += 2
+                continue
+            if arg.startswith("-"):
+                kept.append(arg)
+            else:
+                names.append(arg)
+            i += 1
+        unknown = [k for k in kept if k in ("-p", "--plain", "-s", "--size-x")]
+        for flag in unknown:
+            print(f"  Hinweis: {flag} gilt nur fuer das Terminal-Board")
+        from .desktop import main as desktop_main
+
+        return desktop_main(names or None, argv=[k for k in kept if k not in unknown])
+    if argv:
+        return _terminal_main(argv)
+    return _terminal_main(None)
+
+
+def _terminal_main(argv=None):
     if argv is None and len(sys.argv) == 1 and not sys.stdout.isatty():
         print(BANNER)
         return 0

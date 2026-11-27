@@ -1,0 +1,215 @@
+"""Render a preview of the desktop widgets as a PNG.
+
+    .venv/bin/python tools/desktop_shot.py [wallpaper.png] [--out docs/desktop.png]
+
+It draws the *same* primitives the tkinter cards draw
+(``winwidgets.content.build``) with the *same* colours (``palette.palette``),
+on top of your wallpaper, at the configured opacity - so the picture shows what
+the windows will look like.  Pillow stands in for the Tk canvas: rounded
+card, accent stroke, bars, sparklines, text.
+
+This is a preview, not a screenshot: the real thing is a set of transparent
+windows over the actual desktop.
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+import numpy as np
+from PIL import Image, ImageDraw, ImageFont
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from winwidgets import content, palette as P          # noqa: E402
+from winwidgets.collect import Collector              # noqa: E402
+from winwidgets.wallpaper import (find_wallpaper, sample_pixels,   # noqa: E402
+                                  scheme_from_pixels)
+
+FONT_REG = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+FONT_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+SCALE = 2                       # draw at 2x, downscale: text stays crisp
+OPACITY = 0.82
+
+
+def font(size, bold=False):
+    try:
+        return ImageFont.truetype(FONT_BOLD if bold else FONT_REG, int(size * SCALE))
+    except OSError:
+        return ImageFont.load_default()
+
+
+def demo_wallpaper(size, seed=7):
+    """A stand-in wallpaper, so the preview never shows someone's real desktop.
+
+    Dark teal-to-indigo gradient with a warm light blob off-centre - the kind of
+    picture the colour picker is designed for.
+    """
+    rng = np.random.default_rng(seed)
+    w, h = size
+    yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
+    u, v = xx / w, yy / h
+    top = np.array([24, 30, 54], np.float32)
+    bottom = np.array([8, 10, 16], np.float32)
+    img = top[None, None, :] * (1 - v[..., None]) + bottom[None, None, :] * v[..., None]
+    blobs = [
+        (0.68, 0.30, 0.30, np.array([180, 72, 58], np.float32), 1.1),   # warm
+        (0.25, 0.72, 0.42, np.array([42, 96, 150], np.float32), 0.8),   # cool
+        (0.85, 0.85, 0.22, np.array([120, 60, 140], np.float32), 0.7),  # violet
+    ]
+    for cx, cy, rad, colour, gain in blobs:
+        d2 = ((u - cx) ** 2 + (v - cy) ** 2) / (rad * rad)
+        img += (np.exp(-d2 * 3.0) * gain)[..., None] * colour[None, None, :]
+    img += rng.normal(0, 1.6, img.shape).astype(np.float32)   # a little grain
+    return Image.fromarray(np.clip(img, 0, 255).astype(np.uint8))
+
+
+def fit_wallpaper(path, size):
+    """The wallpaper, cropped to fill - the way Windows fills the desktop."""
+    if path is None:
+        return Image.new("RGB", size, (18, 20, 26))
+    try:
+        img = Image.open(path).convert("RGB")
+    except Exception:
+        return Image.new("RGB", size, (18, 20, 26))
+    target_w, target_h = size
+    scale = max(target_w / img.width, target_h / img.height)
+    img = img.resize((max(1, int(img.width * scale)), max(1, int(img.height * scale))),
+                     Image.LANCZOS)
+    left = (img.width - target_w) // 2
+    top = (img.height - target_h) // 3
+    return img.crop((left, top, left + target_w, top + target_h))
+
+
+def colour_of(hex_string):
+    return tuple(int(hex_string[i:i + 2], 16) for i in (1, 3, 5))
+
+
+def rounded(draw, box, radius, fill, outline=None, width=1):
+    draw.rounded_rectangle(box, radius=radius, fill=fill, outline=outline, width=width)
+
+
+def draw_card(base, kind, x, y, w, h, prim, pal, alpha, title=None, title_font=None):
+    """One card: a translucent rounded panel + the primitives."""
+    layer = Image.new("RGBA", (w * SCALE, h * SCALE), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(layer)
+    bg = tuple(int(pal["bg"][i:i + 2], 16) for i in (1, 3, 5))
+    stroke = tuple(int(pal["stroke"][i:i + 2], 16) for i in (1, 3, 5))
+    a = int(round(alpha * 255))
+    rounded(draw, (1, 1, w * SCALE - 1, h * SCALE - 1), 9 * SCALE,
+            fill=bg + (a,), outline=stroke + (min(255, a + 30),), width=max(1, SCALE // 2))
+    if title:
+        # after the panel: the caption sits on the card, not under it
+        draw.text((content.PAD * SCALE, 11 * SCALE), title.upper(),
+                  font=title_font, fill=colour_of(pal["dim"]) + (a,), anchor="la")
+
+    def colour(item):
+        return tuple(int(item[i:i + 2], 16) for i in (1, 3, 5))
+
+    for item in prim:
+        kind_ = item["type"]
+        if kind_ == "text":
+            f = font(15 if item.get("role") == "hero" else 9,
+                     bold=item.get("role") == "hero")
+            anchor = {"nw": "la", "ne": "ra", "sw": "ld", "se": "rd"}.get(item["anchor"], "la")
+            draw.text((item["x"] * SCALE, item["y"] * SCALE), item["text"],
+                      font=f, fill=colour(item["colour"]) + (a,), anchor=anchor)
+        elif kind_ == "bar":
+            bx, by, bw, bh = (item[k] * SCALE for k in ("x", "y", "w", "h"))
+            track = tuple(int(pal["track"][i:i + 2], 16) for i in (1, 3, 5))
+            rounded(draw, (bx, by, bx + bw, by + bh), bh / 2, fill=track + (a,))
+            filled = item["pct"] / 100.0 * bw
+            if filled > 1:
+                rounded(draw, (bx, by, bx + max(bh, filled), by + bh), bh / 2,
+                        fill=colour(item["colour"]) + (a,))
+        elif kind_ == "spark":
+            values = item["values"]
+            if len(values) < 2:
+                continue
+            sx, sy, sw, sh = (item[k] * SCALE for k in ("x", "y", "w", "h"))
+            high = max(1e-6, max(values))
+            step = sw / max(1, len(values) - 1)
+            points = [(sx + i * step, sy + sh - max(0.0, min(1.0, v / high)) * sh)
+                      for i, v in enumerate(values)]
+            fill = tuple(int(item["fill"][i:i + 2], 16) for i in (1, 3, 5))
+            draw.polygon(points + [(sx + sw, sy + sh), (sx, sy + sh)],
+                         fill=fill + (a,))
+            draw.line(points, fill=colour(item["colour"]) + (a,), width=max(1, SCALE))
+        elif kind_ == "ticks":
+            slot, height = item["slot"] * SCALE, item["h"] * SCALE
+            for i, value in enumerate(item["values"]):
+                bx = (item["x"] * SCALE) + i * (slot + SCALE)
+                if bx + slot > (item["x"] + item["w"]) * SCALE:
+                    break
+                bh = 3 + max(0.0, min(100.0, value)) / 100.0 * height
+                top = item["y"] * SCALE + height - bh
+                draw.rectangle((bx, top, bx + slot, top + bh),
+                               fill=colour(P.level_colour(value, pal)) + (a,))
+    return layer
+
+
+def main(argv):
+    out = ROOT / "docs" / "desktop.png"
+    wallpaper = None
+    args = [a for a in argv if not a.startswith("--")]
+    if "--out" in argv:
+        out = Path(argv[argv.index("--out") + 1])
+        args = [a for a in args if a != str(out)]
+    if "--demo" in argv or not args:
+        wallpaper = None if "--demo" in argv else find_wallpaper()
+    if args:
+        wallpaper = Path(args[0])
+
+    pixels = sample_pixels(wallpaper, 96) if wallpaper else None
+    scheme = scheme_from_pixels(pixels)
+    if pixels is None:
+        demo = demo_wallpaper((640, 360))
+        getter = getattr(demo, "get_flattened_data", None) or demo.getdata
+        pixels = list(getter())
+        scheme = scheme_from_pixels(pixels)
+    pal = P.palette(scheme["accent"], scheme["tint"], scheme["mode"])
+
+    width, height = 1600, 900
+    # the desktop is drawn at 2x and downscaled at the end: cards are composited
+    # at (x * SCALE, y * SCALE), so the background must be 2x too
+    canvas_size = (width * SCALE, height * SCALE)
+    if wallpaper is not None:
+        base = fit_wallpaper(wallpaper, canvas_size).convert("RGBA")
+    else:
+        base = demo_wallpaper(canvas_size).convert("RGB").convert("RGBA")
+
+    collector = Collector()
+    for _ in range(5):
+        collector.tick()
+    snap = collector.sample
+    hist = {"cpu": collector.h_cpu, "mem": collector.h_mem,
+            "down": collector.h_down, "up": collector.h_up}
+
+    title_font = font(8)
+    kinds = ["clock", "cpu", "memory", "disk", "network", "processes"]
+    x, y = width - 340, 48
+    for kind in kinds:
+        w, h = P.card_size(kind, "m")
+        prim = content.build(kind, snap, hist, pal, w, h)
+        layer = draw_card(base, kind, x, y, w, h, prim, pal, OPACITY,
+                          title=content.TITLES.get(kind), title_font=title_font)
+        base.alpha_composite(layer, (x * SCALE, y * SCALE))
+        y += h + 14
+        if y + h > height - 40:
+            y, x = 48, x - 350
+
+    img = base.convert("RGB").resize((width // 2, height // 2), Image.LANCZOS)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    img.save(out, optimize=True, quality=88)
+    source = str(wallpaper) if wallpaper else "no wallpaper found"
+    print(f"  {out}  {out.stat().st_size / 1e3:.0f} kB")
+    print(f"  wallpaper: {source}")
+    print("  accent   : #%02x%02x%02x   tint: #%02x%02x%02x   mode: %s"
+          % (*scheme["accent"], *scheme["tint"], scheme["mode"]))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))

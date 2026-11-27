@@ -1,5 +1,5 @@
-Windows 11 Widgets - im Terminal
-================================
+Windows 11 Widgets - Desktop und Terminal
+=========================================
 
 1. Python installieren (falls noch nicht da): https://www.python.org/downloads/
    Wichtig bei der Installation: Haken bei "Add python.exe to PATH".
@@ -16,9 +16,29 @@ Windows 11 Widgets - im Terminal
 
 3. Starten - das war's:
 
-       python -m winwidgets
+       python -m winwidgets desktop      <- Fenster auf dem Desktop
+       python -m winwidgets              <- dasselbe im Terminal
 
-   Oder einfach doppelklick auf widgets.bat.
+   Oder doppelklick auf widgets-desktop.bat  (Fenster)
+   bzw. widgets.bat                          (Terminal).
+
+Desktop-Fenster
+---------------
+   ziehen            verschieben
+   Rechtsklick       Menue: Groesse, Transparenz, Farben, Beenden
+   Doppelklick       sofort aktualisieren
+   Strg+C im Terminal  beendet ebenfalls
+
+   Farben und Groesse werden zusammen mit den Positionen in
+   %APPDATA%\winwidgets\widgets.json gespeichert - beim naechsten Start
+   stehen die Karten wieder da, wo du sie hingelegt hast.
+
+   Nuetzliche Zusatzoptionen:
+       python -m winwidgets desktop --opacity 0.65
+       python -m winwidgets desktop --size l
+       python -m winwidgets desktop --accent "#ff4d6d"
+       python -m winwidgets desktop --no-wallpaper   (Windows-Akzent statt Bild)
+       python -m winwidgets desktop --reset          (Positionen zuruecksetzen)
 
 Steuerung
 ---------

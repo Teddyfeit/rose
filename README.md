@@ -13,6 +13,39 @@ Grading) ist in diesem Repo selbst geschrieben und läuft auf einem Laptop.
 
 ![Poster](assets/poster.png)
 
+## Windows 11 Widgets — auf dem Desktop
+
+Dieselben Karten, aber als **echte Fenster auf dem Desktop**: randlos,
+halbtransparent, immer im Vordergrund, einzeln verschiebbar. Farben kommen aus
+deinem Hintergrundbild — die Karte nimmt dessen dunkelsten Ton als Glas und
+dessen auffälligste Farbe als Akzent.
+
+![Desktop-Widgets](docs/desktop.png)
+
+```bash
+python -m winwidgets desktop          # Fenster (tkinter, kein Extra-Paket)
+python -m winwidgets desktop --opacity 0.65 --size l
+python -m winwidgets desktop --accent "#ff4d6d"   # statt Bildfarbe
+python -m winwidgets desktop --reset              # Positionen zurücksetzen
+```
+
+Doppelklick auf **`widgets-desktop.bat`** geht auch.
+
+* **ziehen** = verschieben, **Rechtsklick** = Menü (Größe, Transparenz, Farben,
+  Beenden), **Doppelklick** = sofort aktualisieren
+* Position, Größe, Transparenz und Farbe landen in
+  `%APPDATA%\winwidgets\widgets.json` — beim nächsten Start steht alles wie
+  vorher
+* Hintergrundbild wird gelesen (Registry, Windows-Blickpunkt-Cache, oder
+  `W11WIDGETS_WALLPAPER` auf einen Pfad zeigen lassen); ohne Bild nimmt es die
+  Windows-Akzentfarbe
+
+Wie die Optik entsteht: `overrideredirect` (kein Rahmen), echtes Fenster-Alpha,
+Karten als weicher Polygon-Zug im Canvas (abgerundete Ecken), und ein
+Akzent-Rand. Der Vorschau-PNG oben wird mit `tools/desktop_shot.py` aus genau
+denselben Zahlen und Farben gerendert (`winwidgets/content.py` +
+`winwidgets/palette.py`) — deshalb zeigt er, was die Fenster zeigen.
+
 ## Windows 11 Widgets — im Terminal
 
 Dieselbe Idee, andere Richtung: ein **Widget-Board für den Desktop, das in
